@@ -44,7 +44,8 @@ function toImageData(frame: FrameImage): ImageData {
 export class NativeEngine implements Engine {
   readonly id = "native" as const;
   // Optimistic; the real supported set is discovered by the probe and applied at decode.
-  readonly capabilities = { formats: new Set<BarcodeFormat>(ALL_FORMATS) };
+  // `detect()` already returns every code in the frame, in one pass.
+  readonly capabilities = { formats: new Set<BarcodeFormat>(ALL_FORMATS), multi: "inherent" as const };
 
   private probe: Promise<boolean> | null = null;
   private supported: Set<BarcodeFormat> = new Set();

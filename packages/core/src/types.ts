@@ -44,7 +44,8 @@ export interface ScanResult {
   cornerPoints?: Point[];
   timing: {
     totalMs: number;
-    /** True if a WASM/model load happened during this scan (first-scan spike). */
+    /** True if an engine ran `load()` during this scan (first-scan spike). For
+     * `wechat` that is the model download; for `native` just detector setup. */
     coldStart: boolean;
   };
 }
@@ -58,6 +59,17 @@ export interface ScannerOptions {
   worker?: boolean;
   /** Live-video decode throttle, independent of camera fps. Default 10. */
   maxScansPerSecond?: number;
+  /**
+   * Let the single-shot engines (`jsqr`, `wechat`) find more than one code in a
+   * frame, up to this many. Default 1 — off, because it is not free: `wechat`
+   * costs one extra decode per code found, and `jsqr` must scan the frame in
+   * overlapping tiles, which costs the same whether the frame holds ten codes or
+   * one. Intended for still images; leaving it at 1 keeps live video cheap.
+   *
+   * `native` is unaffected — it returns every code it sees in a single pass, at
+   * no extra cost, so its results are never truncated by this.
+   */
+  maxCodesPerFrame?: number;
   /**
    * When the WeChat tier is enabled, a live-video frame whose smaller dimension
    * is below this many pixels eagerly (non-blocking) preloads the WeChat WASM,

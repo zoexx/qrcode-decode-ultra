@@ -42,15 +42,15 @@ flowchart TD
     F(["frame — Blob · video · canvas · ImageBitmap"])
     N["1 · native<br/>platform BarcodeDetector<br/>0 KB · every code in frame"]
     J["2 · jsQR<br/>pure JavaScript<br/>~30 KB · no WASM"]
-    W["3 · WeChat<br/>OpenCV CNN + super-resolution<br/>~2.5 MB WASM"]
+    W["3 · WeChat<br/>OpenCV CNN + super-resolution<br/>~2.5 MB gzipped"]
     R(["ScanResult[]"])
 
-    subgraph worker ["Web Worker — default, zero WASM"]
+    subgraph fast ["fast worker — default, zero WASM"]
         N
         J
     end
 
-    subgraph main ["main thread — opt-in, separate package"]
+    subgraph strong ["strong worker — opt-in, separate package"]
         W
     end
 
@@ -63,8 +63,15 @@ flowchart TD
 ```
 
 - **The default install is zero-WASM.** `native + jsQR` only. The WeChat tier
-  lives in a package you install separately, so its 2.5 MB is never in a default
-  bundle — and never in the worker build.
+  lives in a package you install separately, so its payload is never in a default
+  bundle.
+- **Nothing heavy touches the main thread by default.** The two tiers run in two
+  workers. Measured in headless Chromium on an escalated decode: on the main
+  thread it blocks for a ~290 ms task and drops 17 animation frames; in workers,
+  no long task at all and zero frames dropped. The main thread only rasterizes
+  the frame and routes it. (`worker: false`, or an environment without
+  `Worker`/`OffscreenCanvas`, falls back to in-process — see
+  [`DESIGN.md`](DESIGN.md).)
 - **Native is probed, not trusted.** `'BarcodeDetector' in self` isn't enough:
   the constructor can exist while `detect()` silently returns `[]`, and an
   unrelated ponyfill can shadow it. So the engine runs a live decode of a
@@ -123,14 +130,16 @@ ZXing-based library.
 
 **Codes per frame** depends on which tier won, because tiers are never unioned:
 
-| Tier | Codes per frame |
-|------|-----------------|
-| `native` | **every** code present |
-| `jsqr` | one |
-| `wechat` | one |
+| Tier | Default | With `maxCodesPerFrame` set |
+|------|---------|------------------------------|
+| `native` | **every** code, one pass | unchanged — already free |
+| `jsqr` | one | overlapping tiles — fixed cost, ~2.1s for ten codes |
+| `wechat` | one | mask-and-rescan — one pass per code, ~2.6s for ten |
 
-So multi-code capture is real wherever the native tier is real. Treat
-`onResults` as "everything the winning engine saw", not a completeness guarantee.
+Multi-code is free on `native` and costs extra passes everywhere else, so it is
+opt-in and defaults to off. It is a still-image feature: at those costs, live
+video would drop to a couple of frames a second. Treat `onResults` as
+"everything the winning engine saw", not a completeness guarantee.
 
 ## Packages
 
@@ -150,7 +159,7 @@ table below.
 
 <!--BENCH-->
 
-_Benchmark: 5 images per category, Node runner (Darwin 25.5.0/x64, node v24.17.0), generated 2026-07-30T22:52:53.972Z._
+_Benchmark: 5 images per category, Node runner (Darwin 25.5.0/x64, node v24.17.0), generated 2026-07-31T03:40:17.923Z._
 
 **Detection rate by category** (higher is better):
 
@@ -165,9 +174,9 @@ _Benchmark: 5 images per category, Node runner (Darwin 25.5.0/x64, node v24.17.0
 
 | Engine | cold-start (ms) | median decode (ms) | overall detection |
 |---|---|---|---|
-| qrcode-decode-ultra-fast | 1 | 10.5 | 78% |
-| qrcode-decode-ultra-max | 1217 | 19.8 | 93% |
-| jsqr | 0 | 14.6 | 78% |
+| qrcode-decode-ultra-fast | 1 | 8.5 | 78% |
+| qrcode-decode-ultra-max | 747 | 14.8 | 93% |
+| jsqr | 0 | 10.7 | 78% |
 | native | n/a | n/a | n/a — no platform BarcodeDetector in Node — native needs a real browser |
 
 > Native `BarcodeDetector` is reported `n/a` here because there is no platform backend off-browser; it is not a loss. The honest comparison the cascade lives in is the WASM/JS one above. The WeChat tier's value is its per-category win on hard codes (blur / low-light / downscale / torture) weighed against its cold-start cost.
@@ -180,6 +189,49 @@ What the 2.5 MB actually buys is the hard columns (`downscale_32`, `damaged`,
 `torture`), weighed against the cold-start figure sitting right beside them. That
 pairing is the honest answer to "is the WeChat tier worth it, and for which
 codes".
+
+### In a real browser
+
+The Node runner above cannot see two things: whether the platform
+`BarcodeDetector` actually works, and what a decode costs the *main thread*.
+Both need a browser, so there is a second harness —
+`pnpm build && pnpm benchmark:browser` (Playwright + headless Chromium).
+
+Workers do not make decoding faster; the transport adds a transfer and a round
+trip. What they buy is main-thread availability, so blocking is the metric.
+
+<!--BENCH-BROWSER-->
+
+_Browser benchmark: chromium 151.0.7922.34, Darwin 25.5.0/x64, generated 2026-07-31T02:44:07.523Z._
+
+**Main-thread cost of an escalated decode** — a `downscale_32` fixture, the case the fast path genuinely cannot read, so the WeChat tier runs. Figures span 5 consecutive decodes with the model already loaded.
+
+| Transport | longest task | total blocking | longest frame gap | frames dropped |
+|---|---|---|---|---|
+| main thread (worker: false) | 288 ms | 516 ms | 299 ms | 17 |
+| workers (default) | 0.0 ms | 0.0 ms | 17.8 ms | 0 |
+
+> A task over 50ms is what the browser itself calls blocking; over ~100ms a tap feels unresponsive. `frames dropped` is what a 60fps camera preview loses.
+
+**Per-frame cost at 720p** — a clean code in a 1280x720 frame read by the fast path, no escalation. The gap between the two rows is what the worker transport costs: one bitmap transfer plus a round trip. Absolute wall-clock is inflated by headless software rasterisation, so read the difference, not the magnitude.
+
+| Transport | per frame | longest task | frames dropped |
+|---|---|---|---|
+| main thread (worker: false) | 146 ms | 0.0 ms | 0 |
+| workers (default) | 167 ms | 0.0 ms | 0 |
+
+**Native `BarcodeDetector` on this platform**: available
+
+**Detection rate by category, in-browser** (the `fast` row now includes native):
+
+| Preset | clean | rotated | blur | low_light | inverted | downscale_32 | damaged | torture | Overall |
+|---|---|---|---|---|---|---|---|---|---|
+| fast | 100% | 100% | 100% | 100% | 100% | 0% | 100% | 40% | 80% |
+| max-accuracy | 100% | 100% | 100% | 100% | 100% | 60% | 100% | 80% | 93% |
+
+> Engines that won at least one frame here: native, wechat.
+
+<!--/BENCH-BROWSER-->
 
 ## Development
 

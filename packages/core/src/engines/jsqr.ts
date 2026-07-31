@@ -10,7 +10,9 @@ import type { FrameImage, Point } from "../types.js";
  */
 export class JsQrEngine implements Engine {
   readonly id = "jsqr" as const;
-  readonly capabilities = { formats: new Set<BarcodeFormat>(["qr_code"]) };
+  // jsQR's locator degrades badly with several codes in view — it misses even
+  // the first one — so masking cannot get started. Tiling is the way in.
+  readonly capabilities = { formats: new Set<BarcodeFormat>(["qr_code"]), multi: "tile" as const };
 
   isAvailable(): Promise<boolean> {
     return Promise.resolve(true);

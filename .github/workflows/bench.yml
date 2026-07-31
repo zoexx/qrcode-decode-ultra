@@ -1,0 +1,28 @@
+# Benchmarks are not a merge gate — numbers from shared CI runners are noisy and
+# would fail PRs for reasons unrelated to the change. Run this on demand.
+name: benchmark
+
+on:
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm benchmark
+      - run: pnpm -C benchmark exec playwright install --with-deps chromium
+      - run: pnpm -C benchmark benchmark:browser
+      # Note: `native` is expected to report unavailable on Linux — Chromium has
+      # no Shape Detection backend there. The macOS/Android numbers are the real ones.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark/results/

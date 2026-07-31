@@ -10,6 +10,7 @@ export type RequestId = number;
 export interface WorkerConfig {
   engineIds: EngineId[];
   formats?: BarcodeFormat[];
+  maxCodesPerFrame?: number;
 }
 
 // --- main -> worker ---------------------------------------------------------

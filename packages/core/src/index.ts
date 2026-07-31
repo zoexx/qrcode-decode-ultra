@@ -4,11 +4,13 @@ import { registerBuiltins } from "./engines/builtins.js";
 registerBuiltins();
 
 export { createScanner } from "./scanner.js";
-/** The extension point: `qrcode-decode-ultra-wechat` uses this to add its tier. */
-export { registerEngine } from "./engines/registry.js";
+/** The extension points: `qrcode-decode-ultra-wechat` uses these to add its
+ * tier, and optionally the worker that keeps the tier off the main thread. */
+export { registerEngine, registerEngineWorker } from "./engines/registry.js";
+export type { EngineWorkerFactory } from "./engines/registry.js";
 
 export type { BarcodeFormat } from "./formats.js";
-export type { Engine, EngineResult, EngineCapabilities } from "./engine.js";
+export type { Engine, EngineResult, EngineCapabilities, MultiStrategy } from "./engine.js";
 export type {
   EngineId,
   EnginePreset,

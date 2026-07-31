@@ -1,5 +1,6 @@
 import type { BarcodeFormat } from "./formats.js";
 import { intersectFormats } from "./formats.js";
+import { decodeUpTo, type MultiStrategy } from "./multi.js";
 import type { Diagnostic, EngineId, FrameImage, Point } from "./types.js";
 
 export interface EngineResult {
@@ -11,6 +12,8 @@ export interface EngineResult {
 export interface EngineCapabilities {
   /** Formats this engine can return (post-normalization). */
   formats: ReadonlySet<BarcodeFormat>;
+  /** How this engine can yield more than one code per frame. See `MultiStrategy`. */
+  multi: MultiStrategy;
 }
 
 /**
@@ -56,6 +59,7 @@ export async function runCascade(
   frame: FrameImage,
   requestedFormats: BarcodeFormat[] | undefined,
   onDiagnostic?: (d: Diagnostic) => void,
+  maxCodes = 1,
 ): Promise<CascadeOutcome> {
   let coldStart = false;
 
@@ -75,7 +79,7 @@ export async function runCascade(
         await engine.load();
         coldStart = true;
       }
-      const results = await engine.decode(frame, formats);
+      const results = await decodeUpTo(engine, frame, formats, maxCodes);
       if (results.length > 0) {
         return { results, engine: engine.id, coldStart };
       }
@@ -91,3 +95,5 @@ export async function runCascade(
 
   return { results: [], engine: null, coldStart };
 }
+
+export type { MultiStrategy } from "./multi.js";

@@ -38,22 +38,34 @@ deviates from it, update it in the same change. Do not restate its content here.
 
 The one-paragraph version: a QR-only, first-hit-wins cascade
 (`native → jsqr → wechat`) behind one `Engine` interface, running off the main
-thread by default. `runCascade` (`packages/core/src/engine.ts`) is the single
-implementation; `runScan` (`decode.ts`) wraps it with timing into `ScanResult[]`.
+thread in **two** workers — core's own for the fast path, and one shipped by the
+WeChat package for the strong tier, both speaking the same protocol via the
+shared `serveWorker` / `WorkerClient` pair. `runCascade`
+(`packages/core/src/engine.ts`) is the single cascade implementation; `runScan`
+(`decode.ts`) wraps it with timing into `ScanResult[]`.
 
 Where things live:
 
-- `packages/core` (`qrcode-decode-ultra`) — the scanner. Exports `.` and
-  `./worker`. Zero WASM.
+- `packages/core` (`qrcode-decode-ultra`) — the scanner. Exports `.`, `./worker`
+  (its own worker chunk) and `./worker-runtime` (what an optional tier imports to
+  build a protocol-compatible worker of its own). Zero WASM.
 - `packages/react` (`qrcode-decode-ultra-react`) — one file, `src/index.tsx`:
   `useScanner()` owns getUserMedia + scanner lifecycle, is SSR-safe and
   StrictMode-safe; `<Scanner/>` wraps it. `react>=18` is a peerDep.
-- `packages/wechat` (`qrcode-decode-ultra-wechat`) — the opt-in OpenCV tier.
+- `packages/wechat` (`qrcode-decode-ultra-wechat`) — the opt-in OpenCV tier, plus
+  its own worker. `enableWechat()` registers both an engine factory and a worker
+  factory; the main-thread engine is lazily imported so the ~6MB payload is only
+  fetched on the path that actually uses it. **Never put a WeChat decode on the
+  main thread** — it measures ~250-325ms, a visible freeze on live video.
 - `apps/demo` — private Vite app; the only end-to-end exercise of the lazy
   `enableWechat()` path.
-- `benchmark` — private `tsx` harness. `runner.ts` writes `results/latest.json`
-  (gitignored) and injects the table between the `<!--BENCH-->` markers in the
-  root README.
+- `benchmark` — private `tsx` harness, in two halves. `harness/runner.ts` is the
+  Node runner (detection accuracy, reproduces anywhere); `browser/runner.ts`
+  drives headless Chromium via Playwright for the two things Node cannot see —
+  whether `native` is real, and main-thread blocking. Both write to `results/`
+  (gitignored) and inject between `<!--BENCH-->` / `<!--BENCH-BROWSER-->` markers
+  in the root README. Benchmarks are not in the merge-gate CI workflow; they run
+  from `.github/workflows/bench.yml` on demand.
 
 ## Conventions
 
@@ -66,8 +78,10 @@ Where things live:
   every tier supports. `EngineId` (`native|jsqr|wechat`) is the one shared id set
   across the public API, worker protocol, and benchmark drivers.
 - **The public API surface is deliberately small** — `createScanner`,
-  `registerEngine`, and types. Cascade internals (`runCascade`, the registry
-  helpers, the format helpers) are not re-exported from `index.ts`; don't widen
+  `registerEngine`, `registerEngineWorker`, and types, plus the
+  `./worker-runtime` entry for tiers that ship a worker. Everything else stays
+  internal (`runCascade`, `createEngines`, `buildStatuses`, `hasEngine`,
+  `getEngineWorkerFactory`, `resolveEngineIds`, the format helpers); don't widen
   it without a reason.
 - **Benchmark fairness rule:** every engine receives the *same* `ImageData`,
   decoded once, and a wrong decode is a false positive, not a benign miss.

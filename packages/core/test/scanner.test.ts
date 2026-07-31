@@ -36,7 +36,7 @@ describe("scanner (in-process, jsqr)", () => {
     // registry never provides one, so this can't collide with other tests).
     const multi: Engine = {
       id: "wechat",
-      capabilities: { formats: new Set(["qr_code"]) },
+      capabilities: { formats: new Set(["qr_code"]), multi: "inherent" as const },
       isAvailable: () => Promise.resolve(true),
       load: () => Promise.resolve(),
       ready: () => true,

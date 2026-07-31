@@ -12,7 +12,7 @@ function fakeEngine(
 ): Engine {
   return {
     id,
-    capabilities: { formats: new Set(formats) },
+    capabilities: { formats: new Set(formats), multi: "inherent" as const },
     isAvailable: () => Promise.resolve(true),
     load: () => Promise.resolve(),
     ready: () => true,

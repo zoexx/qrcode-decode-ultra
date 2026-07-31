@@ -40,7 +40,7 @@ await scanner.dispose();
 |--------|---------|---------|-------|
 | `native` | platform `BarcodeDetector` | 0 | probed before trust — it can be present-but-broken or polyfill-shadowed; absent on Windows/Linux/iOS/Firefox |
 | `jsqr` | jsQR (pure JS) | ~30 KB | clean QR decodes here with **no WASM load** |
-| `wechat` | OpenCV WeChat (CNN + super-resolution) | ~2.5 MB WASM | opt-in strong tier for low-res / small / blurry codes; separate package, lazy-loaded |
+| `wechat` | OpenCV WeChat (CNN + super-resolution) | ~2.5 MB WASM | opt-in strong tier for low-res / small / blurry codes; separate package, runs in its own worker, lazy-loaded |
 
 First-hit-wins: the first engine to decode anything returns immediately. Each
 decoder validates error-correction internally, so a returned result is already a
@@ -70,8 +70,27 @@ one missed — so per-frame yield depends on which tier won:
 | `jsqr` | one |
 | `wechat` | one |
 
-Multi-code capture is therefore real wherever the native tier is real. Treat
-`onResults` as "everything the winning engine saw", not a completeness guarantee.
+Multi-code capture is free on `native`, which returns every code in one pass.
+The other two decode one code per call, so extra codes cost extra passes — set
+`maxCodesPerFrame` above 1 to opt in:
+
+| Tier | Codes per frame | With `maxCodesPerFrame: 10` |
+|------|-----------------|------------------------------|
+| `native` | **every** code, 1 pass | unchanged — never capped, it is already free |
+| `jsqr` | one | scans overlapping tiles; **fixed** cost whether the frame holds 10 codes or 1 |
+| `wechat` | one | masks each hit out and rescans; costs one pass **per code found** |
+
+Measured on a 1380x592 sheet of ten codes (Node, in-process): `jsqr` 10/10 in
+~2.1s, `wechat` 10/10 in ~2.6s. On a single-code image the same setting costs
+~190ms (jsqr) and ~440ms (wechat) versus ~45ms / ~260ms at the default.
+
+That is why the default is 1: it keeps live video cheap. Treat this as a
+still-image feature, and treat `onResults` as "everything the winning engine
+saw", not a completeness guarantee.
+
+jsQR's tiling is a heuristic — tiles are sized off the frame, so codes much
+smaller than half the shorter side may still be missed. `wechat` uses its own
+detected geometry and has no such limit.
 
 ## Options
 
@@ -81,6 +100,7 @@ createScanner({
   formats: ["qr_code"],     // restrict formats (default: ["qr_code"])
   worker: true,             // run engines off the main thread (default true)
   maxScansPerSecond: 10,    // live-video throttle, independent of camera fps
+  maxCodesPerFrame: 1,      // let jsqr/wechat find more than one code (default 1 = off)
   lowResPreloadPx: 480,     // when WeChat is enabled, eagerly preload its WASM once
                             // a live-video frame's smaller dimension drops below this
                             // many pixels (non-blocking); 0 disables. default 480
@@ -118,6 +138,43 @@ Each `ScanResult` carries `value`, `format`, the `engine` that produced it,
 `cornerPoints` when available, and `timing: { totalMs, coldStart }` — where
 `coldStart` is true if a WASM/model load happened during that scan.
 
+## Writing your own tier
+
+`registerEngine` adds an engine to the cascade at runtime — that is how
+`qrcode-decode-ultra-wechat` plugs in without core ever depending on it:
+
+```ts
+import { registerEngine } from "qrcode-decode-ultra";
+registerEngine("wechat", () => new MyEngine()); // implements the Engine interface
+```
+
+If your engine is heavy, also register a **worker** for it with
+`registerEngineWorker`. The scanner then drives it as a second worker on a
+fast-path miss instead of blocking the main thread:
+
+```ts
+import { registerEngine, registerEngineWorker } from "qrcode-decode-ultra";
+
+registerEngine("wechat", () => new MyEngine());          // in-process fallback
+registerEngineWorker(
+  "wechat",
+  () => new Worker(new URL("./my.worker.js", import.meta.url), { type: "module" }),
+);
+```
+
+Build that worker against `qrcode-decode-ultra/worker-runtime`, which gives you
+the protocol server and nothing else — no built-in engines, so your worker
+bundle stays small:
+
+```ts
+// my.worker.ts
+import { registerEngine, serveWorker } from "qrcode-decode-ultra/worker-runtime";
+registerEngine("wechat", () => new MyEngine());
+serveWorker();
+```
+
+Registering a worker is optional; without one the engine simply runs in-process.
+
 ## Notes
 
 - ESM-only, TypeScript types included. Requires **TypeScript ≥ 5.7** (the
@@ -128,6 +185,9 @@ Each `ScanResult` carries `value`, `format`, the `engine` that produced it,
   far side, so a caller-supplied one is cloned first.)
 - The worker ships as a separate entry, loaded by URL; consumer bundlers (Vite,
   webpack 5) pick it up via the `new Worker(new URL(...))` pattern automatically.
+- With the WeChat tier enabled there are **two** workers: this package's fast
+  path, plus the tier's own (registered by `enableWechat()`). Both speak the same
+  protocol, and `dispose()` tears down both.
 - If `Worker` / `OffscreenCanvas` / `createImageBitmap` are unavailable, or you
   pass `worker: false`, the same engines run in-process with an identical result
   contract.

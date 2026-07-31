@@ -81,7 +81,7 @@ Two rules carry the whole design:
 `ImageData` is structurally assignable to `FrameImage`, so a real `getImageData()`
 result is a valid frame and tests can build one without a DOM.
 
-## 3. Split transport
+## 3. Two workers, one protocol
 
 `worker/protocol.ts` is the single source of truth for both sides: typed
 discriminated unions, id-correlated request/response.
@@ -89,30 +89,76 @@ discriminated unions, id-correlated request/response.
 - main → worker: `init`, `preload`, `decode`, `dispose`
 - worker → main: `ready`, `preloaded`, `result`, `error`, `disposed`
 
-**The worker runs the fast path only — `native + jsqr`.** WeChat is never in the
-worker build, because core must not statically import the optional
-`qrcode-decode-ultra-wechat` package. So the scanner runs a split transport:
+**Core's worker build contains the fast path only — `native + jsqr`.** It is a
+pre-built artifact, emitted by tsup when *core* publishes, so it can only hold
+what core statically imports — and core deliberately does not depend on
+`qrcode-decode-ultra-wechat` (§6). That constraint is real, but it applies to
+*that* worker, not to workers in general.
 
-1. **Fast path in the worker.** The main thread produces an `ImageBitmap`; the
-   worker draws it to an `OffscreenCanvas`, calls `getImageData()` once, runs
-   `native → jsqr`, replies with a hit or a miss, and `close()`s the bitmap. The
-   common case stays entirely off the main thread.
-2. **WeChat escalation in-process.** When the worker reports a miss *and* the
-   WeChat tier is enabled, the main thread runs the in-process `WechatEngine` on
-   the same frame. WeChat decodes are rare (only frames the fast path missed) and
-   heavy regardless, and the one-in-flight backpressure bounds them, so one
-   occasional main-thread decode is acceptable.
+So the strong tier ships **its own** worker. `qrcode-decode-ultra-wechat` does
+have `qr-scanner-wechat` as a static dependency, so its own build can emit a
+self-contained worker chunk; `enableWechat()` registers a factory for it
+(`registerEngineWorker`), and the scanner drives it as a second worker:
 
-   Because the main thread needs the pixels for that possible second pass, when
-   WeChat is enabled the scanner rasterizes the source to `ImageData` once on the
-   main thread and sends a bitmap *copy* to the worker. When WeChat is off it
-   keeps the zero-copy `ImageBitmap` transfer — the fast path pays nothing for a
-   tier it doesn't use.
+1. **Fast path.** The main thread hands core's worker an `ImageBitmap`; the
+   worker draws it to an `OffscreenCanvas`, `getImageData()` once, runs
+   `native → jsqr`, replies with a hit or a miss, and `close()`s the bitmap.
+2. **Escalation.** On a miss, the same frame goes to the tier's worker over the
+   identical protocol — so `WorkerClient` and the worker-side server
+   (`serveWorker`) are shared verbatim; the only difference between the two
+   workers is which engines their module graph registered.
 
-**No-worker fallback.** If `Worker` / `OffscreenCanvas` / `createImageBitmap` are
-unavailable (or `worker: false`), the scanner instantiates the same `Engine[]` —
-including WeChat when enabled — on the main thread and calls the same `runScan`.
-Same result contract; only the transport differs.
+Both tiers need the *same* pixels, and a live `<video>` advances between grabs,
+so when an escalation is possible the scanner rasterizes the source once and
+derives each worker's bitmap from that single frame.
+
+**Why two workers rather than one.** Putting WeChat on the main thread — the
+obvious simplification — is not viable. Measured in headless Chromium
+(`pnpm benchmark:browser`), an escalated decode on the main thread blocks for a
+~290 ms task and drops 17 animation frames; through the workers it produces no
+long task and drops none. In Node the same decode measures ~250-325 ms
+(per-category medians), with a 0.6-1.2 s model load on top. At the
+default 10 scans/second that is a near-continuous main-thread block for as long
+as the user is pointing at a hard code. `maxScansPerSecond` throttles when
+decodes *start*; it does nothing about the block itself.
+
+**The optional tier can never break the fast path.** Bring-up of the strong
+tier's worker is fully contained: `new Worker(...)` alone throws synchronously
+under a CSP `worker-src` denial, a cross-origin URL, or a bundler that never
+emitted the chunk. Any such failure degrades to `available: false` (or to the
+in-process engine), never a rejected `ready()`. The two `init` round trips are
+also issued concurrently, so the fast path never waits on megabytes of WASM to
+start decoding.
+
+Two related rules keep a dead worker from wedging live video:
+
+- `WorkerClient` latches a `dead` state on `onerror` and on dispose, and every
+  later `send()` fails fast against it. A post to a worker that will never answer
+  would otherwise leave a promise pending forever — and `scanVideo`'s `inFlight`
+  flag never clears, so the loop silently stops decoding while still reporting
+  `running: true`.
+- A tier worker that dies mid-session is dropped and the scan continues on the
+  fast path, reported through `onDiagnostic`. A fatal death of the *fast* worker
+  stops the controller after one `onError`, rather than re-failing every frame.
+
+Worker errors reach the consumer as the `ScanError` they already are — code and
+message intact — rather than being flattened by `String(err)`.
+
+**Fallbacks to the main thread.** There are exactly three, and all of them run
+the same `Engine[]` through the same `runScan`, so the result contract never
+changes — only the transport does:
+
+1. `worker: false`.
+2. No worker transport: `Worker` / `OffscreenCanvas` / `createImageBitmap`
+   missing.
+3. A tier registered an engine factory but **no** worker factory — e.g. a
+   consumer calling `registerEngine("wechat", …)` by hand, or a version of the
+   tier package predating `registerEngineWorker`. The scanner still runs it,
+   in-process, rather than dropping the tier.
+
+The tier's in-process engine loads its payload lazily, so a consumer who never
+takes any of these paths never downloads it: the bytes live in the worker chunk
+instead.
 
 **Source ownership.** Every `ImageSource` stays the caller's. The library never
 closes, detaches, or consumes a source it was handed — notably an `ImageBitmap`,
@@ -121,7 +167,36 @@ bitmap and closes it on the far side, so a caller-supplied `ImageBitmap` is
 cloned before it is sent; only bitmaps the library created itself (e.g. decoded
 from a `Blob`) are closed.
 
-## 4. Live video: backpressure, preload, teardown
+## 4. More than one code per frame
+
+`native` returns every code it sees in one pass. The other two decode one code
+per call and have no multi API, so `maxCodesPerFrame` (default 1, off) drives
+them through one of two strategies, declared per engine as
+`capabilities.multi`:
+
+- **`mask`** (`wechat`) — decode, paint the hit out of a scratch copy of the
+  pixels using its `cornerPoints`, decode again. Terminates on its own and costs
+  one pass per code actually present. Guards: a hit with no geometry, a
+  degenerate box, or a repeated value all stop the loop rather than spin.
+- **`tile`** (`jsqr`) — jsQR's *locator* collapses when several codes are in
+  view: measured on a ten-code sheet it misses even the first one, so masking
+  can never get started. Instead the frame is decoded whole, then in overlapping
+  tiles. Overlap is what decides coverage — a half-tile step found 8/10 while a
+  third-tile step found 10/10, and adding more tile *sizes* changed nothing.
+  The whole-frame pass is not an optimisation: tiles are sized off the frame, so
+  a code filling most of it fits in no tile, and without that pass multi-code
+  mode would lose the single-code case.
+
+`inherent` engines are never capped — there is no extra work to bound, and
+truncating free results would be a regression. The caller's frame is never
+mutated; masking works on a copy, and tile geometry is translated back into
+source coordinates.
+
+Tiling stays a heuristic: tile size is guessed from the frame, so codes much
+smaller than half the shorter side can still be missed. That is the honest limit
+of doing this without a finder-pattern detector of our own.
+
+## 5. Live video: backpressure, preload, teardown
 
 These live in the `scanVideo` loop in `scanner.ts`, not in the worker client —
 the client just does one round trip.
@@ -133,7 +208,8 @@ the client just does one round trip.
 3. A `maxScansPerSecond` throttle, independent of camera fps.
 
 **Preload-on-low-res.** A cheap `min(videoWidth, videoHeight) < lowResPreloadPx`
-check (default 480) fires the WeChat engine's `load()` early — idempotent,
+check (default 480) warms the WeChat tier early — a `preload` message to its
+worker, or the in-process engine's `load()` — idempotent,
 non-blocking, once per scanner — so the 2.5 MB is warm *before* the frame where
 escalation finally fires. Frame resolution is a *proxy* for QR-apparent-size (a
 tiny QR in a 4K frame reads as "high-res" by this measure); it is the cheap,
@@ -141,12 +217,13 @@ zero-extra-work signal available without doing detection first.
 `lowResPreloadPx: 0` disables it. Still images skip the preload and simply load
 WeChat on demand when the cascade reaches it.
 
-**Teardown.** Main posts `dispose`; the worker stops accepting new messages,
-disposes its engines and replies `disposed` — a decode already in flight is
-allowed to finish and closes its own bitmap. Main then `terminate()`s (on
-`disposed`, or after a 200 ms timeout) and disposes the in-process WeChat engine.
+**Teardown.** Main posts `dispose` to every worker it spawned; each stops
+accepting new messages, disposes its engines and replies `disposed` — a decode
+already in flight is allowed to finish and closes its own bitmap. Main then
+`terminate()`s (on `disposed`, or after a 200 ms timeout) and disposes the
+in-process engine if one was built.
 
-## 5. Engine registration and bundle size
+## 6. Engine registration and bundle size
 
 `engines/registry.ts` holds a `Map<EngineId, EngineFactory>` with **no static
 engine imports**. Each entry point registers only what it needs, so heavy tiers
@@ -157,17 +234,23 @@ stay out of bundles that never ask for them:
   `registerBuiltins()` again (native + jsqr only)
 - `qrcode-decode-ultra-wechat` registers `wechat` at runtime, when the consumer
   calls `enableWechat()`
+- that same call also registers a **worker factory** via `registerEngineWorker`,
+  and the tier's own worker registers `wechat` inside its own module graph
 
 A requested id with no registered factory is reported as an unavailable
-`EngineStatus`, not an error. The main thread strips `wechat` out of the worker's
-engine list and reports that tier's status itself.
+`EngineStatus`, not an error. The main thread strips `wechat` out of core's
+worker list and resolves that tier's status from its own worker's `init`.
+
+`qrcode-decode-ultra/worker-runtime` is the entry an optional tier imports to
+build such a worker: it exposes `registerEngine` + `serveWorker` and nothing
+else, so a tier's worker bundle carries no jsQR it will never run.
 
 Because `index.ts` and the worker entry both call `registerBuiltins()` as a
 top-level statement, core declares `sideEffects` as those two files rather than
 `false` — a bundler told the module is side-effect-free would be free to drop the
 registration and leave the registry empty.
 
-## 6. Packaging
+## 7. Packaging
 
 ```
 qrcode-decode-ultra/            # pnpm workspace, ESM-only
@@ -192,7 +275,7 @@ with tsup. The default core build is already zero-WASM, so there is no separate
 loaded by URL via `new Worker(new URL("./scanner.worker.js", import.meta.url))`,
 which bundlers (Vite, webpack 5) detect and emit automatically.
 
-## 7. Licensing
+## 8. Licensing
 
 - QRCode Decode Ultra's own code: **MIT**.
 - Bundled engines are **Apache-2.0** and stay Apache-2.0 — redistributable inside

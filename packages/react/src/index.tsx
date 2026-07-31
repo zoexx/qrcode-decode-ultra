@@ -15,6 +15,15 @@ export interface UseScannerOptions {
   formats?: BarcodeFormat[];
   worker?: boolean;
   maxScansPerSecond?: number;
+  /**
+   * Find up to this many codes per frame. Default 1.
+   *
+   * Free on `native`, which returns every code it saw in one pass. On `jsqr` and
+   * `wechat` it costs extra decode passes per frame — on live video that shows up
+   * as a lower effective scan rate, not a frozen UI, since decoding is off the
+   * main thread and a busy frame is skipped rather than queued.
+   */
+  maxCodesPerFrame?: number;
   /** Low-res frame threshold (px) that eagerly preloads the WeChat tier. Default 480. */
   lowResPreloadPx?: number;
   /** Which camera to request. Default "environment" (rear). */
@@ -126,6 +135,7 @@ export function useScanner(options: UseScannerOptions = {}): UseScannerReturn {
           formats: o.formats,
           worker: o.worker,
           maxScansPerSecond: o.maxScansPerSecond,
+          maxCodesPerFrame: o.maxCodesPerFrame,
           lowResPreloadPx: o.lowResPreloadPx,
         });
       }

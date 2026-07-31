@@ -1,5 +1,12 @@
+import type { EngineWorkerFactory } from "../engines/registry.js";
 import type { Diagnostic, EngineStatus, ScanError, ScanResult } from "../types.js";
 import type { MainToWorker, RequestId, WorkerConfig, WorkerToMain } from "./protocol.js";
+
+function defaultWorkerFactory(): Worker {
+  // Consumer bundlers (Vite, webpack 5) detect this literal and emit the worker
+  // chunk; native ESM resolves it relative to the built module.
+  return new Worker(new URL("./scanner.worker.js", import.meta.url), { type: "module" });
+}
 
 export interface DecodeOutcome {
   /** Every code the winning engine decoded in this frame. */
@@ -22,11 +29,22 @@ export class WorkerClient {
   private nextId: RequestId = 1;
   private pending = new Map<RequestId, Pending>();
   private disposing = false;
+  /**
+   * Set once the worker can no longer answer (crashed, or disposed). Every later
+   * `send()` fails fast against it. Without this a post to a dead worker creates
+   * a pending entry nothing will ever settle — which silently wedges the
+   * `scanVideo` loop: `inFlight` never clears and frames stop being decoded
+   * while the controller still reports `running`.
+   */
+  private dead: ScanError | null = null;
 
-  constructor() {
-    // Consumer bundlers (Vite, webpack 5) detect this literal and emit the
-    // worker chunk; native ESM resolves it relative to the built module.
-    this.worker = new Worker(new URL("./scanner.worker.js", import.meta.url), { type: "module" });
+  /**
+   * @param workerFactory spawns the worker to drive. Defaults to core's own
+   * fast-path worker; the WeChat tier passes the factory its package registered,
+   * so one client implementation drives both workers over the same protocol.
+   */
+  constructor(workerFactory: EngineWorkerFactory = defaultWorkerFactory) {
+    this.worker = workerFactory();
     this.worker.onmessage = (event: MessageEvent<WorkerToMain>) => this.onMessage(event.data);
     this.worker.onerror = (event) => this.onFatal(event.message || "worker error");
   }
@@ -55,14 +73,32 @@ export class WorkerClient {
 
   private onFatal(message: string): void {
     const error: ScanError = { code: "worker-died", message };
+    this.dead = error;
     for (const pending of this.pending.values()) pending.reject(error);
     this.pending.clear();
   }
 
+  /** True once this worker has crashed or been disposed; it will never answer. */
+  get isDead(): boolean {
+    return this.dead !== null || this.disposing;
+  }
+
   private send<T>(message: MainToWorker, transfer?: Transferable[]): Promise<T> {
+    // Fail fast rather than posting into a dead or terminating worker. `disposing`
+    // is checked too: dispose() can land between a caller resolving `this.client`
+    // and awaiting its bitmap argument, and terminate() silently drops the message.
+    if (this.dead) return Promise.reject(this.dead);
+    if (this.disposing && message.type !== "dispose") {
+      return Promise.reject({ code: "worker-died", message: "disposed" } satisfies ScanError);
+    }
     return new Promise<T>((resolve, reject) => {
       this.pending.set(message.id, { resolve: resolve as Pending["resolve"], reject });
-      this.worker.postMessage(message, transfer ?? []);
+      try {
+        this.worker.postMessage(message, transfer ?? []);
+      } catch (err) {
+        this.pending.delete(message.id);
+        reject({ code: "worker-died", message: err instanceof Error ? err.message : String(err) } satisfies ScanError);
+      }
     });
   }
 

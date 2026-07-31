@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     "scanner.worker": "src/worker/scanner.worker.ts",
+    "worker-runtime": "src/worker/runtime.ts",
   },
   format: ["esm"],
   target: "es2022",

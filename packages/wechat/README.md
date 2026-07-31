@@ -3,8 +3,8 @@
 The opt-in **OpenCV WeChat QRCode** engine for
 [QRCode Decode Ultra](https://github.com/zoexx/qrcode-decode-ultra). A CNN
 detector + super-resolution model that decodes the small, blurry, damaged and
-low-light QR codes the native and jsQR fast path miss — at the cost of a ~2.5 MB
-WASM payload, loaded lazily only when the cascade reaches this tier.
+low-light QR codes the native and jsQR fast path miss — at the cost of a ~6 MB
+payload (~2.5 MB gzipped), loaded lazily only when the cascade reaches this tier.
 
 It lives in its own package on purpose: a default `qrcode-decode-ultra` install
 stays zero-WASM, and you add the heavy tier only when you need it.
@@ -37,14 +37,32 @@ const { enableWechat } = await import("qrcode-decode-ultra-wechat");
 enableWechat();
 ```
 
-## Notes
+## How it runs
 
-- Best for still images and "scan this hard photo", not 60fps video — this is the
-  accuracy tier, not the speed tier.
-- WeChat runs in-process on the main thread (the core worker build never includes
-  it), but it still works with the worker default: the worker runs the
-  native + jsQR fast path, and on a miss the main thread runs the WeChat decode.
-  Still-image use can also pass `worker: false`.
+`enableWechat()` registers a **worker** for this tier, not just an engine. The
+scanner then runs two workers: core's own for the `native + jsQR` fast path, and
+this package's for WeChat, which it drives on a fast-path miss.
+
+That matters because this tier is heavy. From the repo's own benchmark
+(`pnpm benchmark`, numbers in the [root README](../../README.md#benchmark)):
+
+| | cost |
+|---|---|
+| download | ~6 MB raw, ~2.5 MB gzipped |
+| model load, once | 0.6–1.2 s depending on machine |
+| decode, per escalated frame | ~250 ms (`downscale_32`) to ~325 ms (`torture`) — category medians |
+
+On a live camera the fast path misses on *every* frame while the user lines up a
+hard code, so on the main thread that would be a near-continuous freeze rather
+than an occasional hitch. In its own worker it costs nothing visible.
+
+The engine still runs in-process if there is nowhere else to put it — `worker:
+false`, or an environment without `Worker`/`OffscreenCanvas`. That path loads the
+payload lazily, so you only download it if you actually take it.
+
+It is still the accuracy tier, not the speed tier: at ~250–325 ms per escalated
+frame you will not get 60fps out of it, and it is at its best on still images and
+"scan this hard photo".
 
 ## License
 

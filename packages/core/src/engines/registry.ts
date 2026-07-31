@@ -21,6 +21,26 @@ export function hasEngine(id: EngineId): boolean {
   return FACTORIES.has(id);
 }
 
+/** Spawns a worker that serves this engine over the standard worker protocol. */
+export type EngineWorkerFactory = () => Worker;
+
+/**
+ * Worker factories for optional tiers that ship their own worker chunk. Core's
+ * own worker build can only contain engines core statically imports, so a heavy
+ * tier in a separate package registers its worker here instead — and the
+ * scanner drives it as a second worker rather than running it in-process.
+ * Registering one is optional: without it the tier falls back to the main thread.
+ */
+const WORKER_FACTORIES = new Map<EngineId, EngineWorkerFactory>();
+
+export function registerEngineWorker(id: EngineId, factory: EngineWorkerFactory): void {
+  WORKER_FACTORIES.set(id, factory);
+}
+
+export function getEngineWorkerFactory(id: EngineId): EngineWorkerFactory | undefined {
+  return WORKER_FACTORIES.get(id);
+}
+
 export const PRESETS: Record<EnginePreset, EngineId[]> = {
   fast: ["native", "jsqr"],
   "max-accuracy": ["native", "jsqr", "wechat"],

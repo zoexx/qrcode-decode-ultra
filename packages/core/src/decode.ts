@@ -17,9 +17,10 @@ export async function runScan(
   frame: FrameImage,
   formats: BarcodeFormat[] | undefined,
   onDiagnostic?: (d: Diagnostic) => void,
+  maxCodes = 1,
 ): Promise<ScanResult[]> {
   const t0 = now();
-  const outcome = await runCascade(engines, frame, formats, onDiagnostic);
+  const outcome = await runCascade(engines, frame, formats, onDiagnostic, maxCodes);
   const totalMs = now() - t0;
   if (!outcome.engine) return [];
   const engineId = outcome.engine;

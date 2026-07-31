@@ -1,87 +1,89 @@
 import {
   registerEngine,
+  registerEngineWorker,
   type BarcodeFormat,
   type Engine,
   type EngineResult,
   type FrameImage,
-  type Point,
 } from "qrcode-decode-ultra";
-import { ready, scan } from "qr-scanner-wechat";
 
 /**
- * OpenCV WeChat QRCode engine — high accuracy on small / blurry / damaged /
- * low-light codes via a CNN detector + super-resolution. ~2.5MB WASM, loaded
- * lazily only when the cascade reaches this tier. QR / data-matrix oriented.
+ * A stand-in for the real engine that defers `import("./engine.js")` — and with
+ * it the ~6MB `qr-scanner-wechat` payload — until the cascade actually reaches
+ * this tier on the main thread.
  *
- * This is the opt-in strong tier: it lives in its own package so a default
- * QRCode Decode Ultra install stays zero-WASM. Call `enableWechat()` once, then use the
- * "max-accuracy" preset (or include "wechat" in an explicit engine list).
- *
- * Runs in-process: the qrcode-decode-ultra worker build never includes it, so the
- * scanner runs the worker fast path (native + jsQR) and escalates to this engine
- * on the main thread on a miss (low-res / hard codes), preloading it on low-res
- * frames so the escalation doesn't stall.
+ * This matters because the tier normally runs in its own worker: without the
+ * indirection, calling `enableWechat()` would pull the entire engine into the
+ * main bundle as well, shipping the payload twice for a decode that is never
+ * going to happen there.
  */
-export class WechatEngine implements Engine {
+class LazyWechatEngine implements Engine {
   readonly id = "wechat" as const;
-  readonly capabilities = { formats: new Set<BarcodeFormat>(["qr_code"]) };
+  readonly capabilities = { formats: new Set<BarcodeFormat>(["qr_code"]), multi: "mask" as const };
 
-  private loadPromise: Promise<void> | null = null;
-  private loaded = false;
+  private inner: Engine | null = null;
+  private loading: Promise<void> | null = null;
 
   isAvailable(): Promise<boolean> {
     return Promise.resolve(typeof WebAssembly !== "undefined");
   }
 
   load(): Promise<void> {
-    if (!this.loadPromise) {
-      this.loadPromise = ready().then(() => {
-        this.loaded = true;
+    if (!this.loading) {
+      this.loading = import("./engine.js").then(async ({ WechatEngine }) => {
+        const engine = new WechatEngine();
+        await engine.load();
+        this.inner = engine;
       });
     }
-    return this.loadPromise;
+    return this.loading;
   }
 
   ready(): boolean {
-    return this.loaded;
+    return this.inner !== null;
   }
 
-  async decode(frame: FrameImage, _formats: BarcodeFormat[]): Promise<EngineResult[]> {
-    // qr-scanner-wechat accepts an ImageDataLike { data, width, height } — which
-    // is exactly the shape of a QRCode Decode Ultra FrameImage, so no canvas round-trip.
-    const result = await scan({ data: frame.data, width: frame.width, height: frame.height });
-    if (!result || !result.text) return [];
-
-    const rect = result.rect;
-    const cornerPoints: Point[] | undefined = rect
-      ? [
-          { x: rect.x, y: rect.y },
-          { x: rect.x + rect.width, y: rect.y },
-          { x: rect.x + rect.width, y: rect.y + rect.height },
-          { x: rect.x, y: rect.y + rect.height },
-        ]
-      : undefined;
-
-    return [{ value: result.text, format: "qr_code", cornerPoints }];
+  async decode(frame: FrameImage, formats: BarcodeFormat[]): Promise<EngineResult[]> {
+    if (!this.inner) await this.load();
+    return this.inner!.decode(frame, formats);
   }
 
   dispose(): void {
-    this.loaded = false;
-    this.loadPromise = null;
+    this.inner?.dispose();
+    this.inner = null;
+    this.loading = null;
   }
 }
 
 /**
- * Register the WeChat engine with QRCode Decode Ultra's core. Call this once before creating
- * a scanner that uses the "wechat" engine or the "max-accuracy" preset.
+ * Register the WeChat tier with QRCode Decode Ultra's core. Call this once
+ * before creating a scanner that uses the `wechat` engine or the
+ * `max-accuracy` preset.
  *
  * ```ts
  * import { createScanner } from "qrcode-decode-ultra";
  * import { enableWechat } from "qrcode-decode-ultra-wechat";
  * enableWechat();
- * const scanner = createScanner({ engines: "max-accuracy", worker: false });
+ * const scanner = createScanner({ engines: "max-accuracy" });
  * ```
+ *
+ * Registers two things:
+ *
+ * - the **worker factory**, so the scanner runs this tier in its own worker.
+ *   This is the path you want: a WeChat decode costs ~200ms and its model load
+ *   ~600ms, both of which would otherwise block the main thread on every
+ *   fast-path miss.
+ * - the **engine factory**, used only when there is no worker to run it in
+ *   (`worker: false`, or an environment without `Worker`/`OffscreenCanvas`).
+ *   It loads the payload lazily, so this fallback costs nothing unless taken.
+ *
+ * Bundlers (Vite, webpack 5) detect the `new Worker(new URL(...))` literal below
+ * and emit the worker chunk automatically.
  */
 export function enableWechat(): void {
-  registerEngine("wechat", () => new WechatEngine());
+  registerEngine("wechat", () => new LazyWechatEngine());
+  registerEngineWorker(
+    "wechat",
+    () => new Worker(new URL("./wechat.worker.js", import.meta.url), { type: "module" }),
+  );
 }

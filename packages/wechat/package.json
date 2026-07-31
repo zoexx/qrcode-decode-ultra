@@ -22,7 +22,9 @@
     "wechat",
     "wasm"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/wechat.worker.js"
+  ],
   "files": [
     "dist",
     "LICENSE",
@@ -33,6 +35,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./worker": {
+      "types": "./dist/wechat.worker.d.ts",
+      "import": "./dist/wechat.worker.js"
     },
     "./package.json": "./package.json"
   },

@@ -41,6 +41,10 @@
       "types": "./dist/scanner.worker.d.ts",
       "import": "./dist/scanner.worker.js"
     },
+    "./worker-runtime": {
+      "types": "./dist/worker-runtime.d.ts",
+      "import": "./dist/worker-runtime.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

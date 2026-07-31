@@ -8,6 +8,7 @@
     "gen": "tsx scripts/gen-synthetic.ts",
     "benchmark": "tsx scripts/gen-synthetic.ts && tsx harness/runner.ts",
     "report": "tsx harness/runner.ts",
+    "benchmark:browser": "tsx browser/runner.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -20,7 +21,9 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/qrcode": "^1.5.5",
+    "playwright": "^1.50.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vite": "^8.0.0"
   }
 }
