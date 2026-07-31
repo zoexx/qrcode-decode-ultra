@@ -1,0 +1,26 @@
+{
+  "name": "qrcode-decode-ultra-benchmark",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Reproducible detection-rate + speed benchmark: qrcode-decode-ultra-fast vs qrcode-decode-ultra-max (WeChat ablation) vs jsQR.",
+  "scripts": {
+    "gen": "tsx scripts/gen-synthetic.ts",
+    "benchmark": "tsx scripts/gen-synthetic.ts && tsx harness/runner.ts",
+    "report": "tsx harness/runner.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "qrcode-decode-ultra": "workspace:*",
+    "qrcode-decode-ultra-wechat": "workspace:*",
+    "jsqr": "1.4.0",
+    "qrcode": "1.5.4",
+    "sharp": "^0.34.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/qrcode": "^1.5.5",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

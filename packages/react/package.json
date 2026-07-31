@@ -1,0 +1,51 @@
+{
+  "name": "qrcode-decode-ultra-react",
+  "version": "1.0.0",
+  "description": "React binding for QRCode Decode Ultra — useScanner() hook + <Scanner/> component.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Zoe Ying",
+  "homepage": "https://github.com/zoexx/qrcode-decode-ultra",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zoexx/qrcode-decode-ultra.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/zoexx/qrcode-decode-ultra/issues"
+  },
+  "keywords": [
+    "qr",
+    "scanner",
+    "react",
+    "react-hook",
+    "camera"
+  ],
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "qrcode-decode-ultra": "workspace:^"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "react": "^19.2.0",
+    "tsup": "8.5.1",
+    "typescript": "^5.7.0"
+  }
+}

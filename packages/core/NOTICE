@@ -1,0 +1,10 @@
+qrcode-decode-ultra
+Copyright (c) 2026 Zoe Ying
+
+MIT licensed (see LICENSE). This package depends on a third-party component
+under the Apache License, Version 2.0, whose notice is preserved:
+
+jsQR (via the `jsqr` package)
+  Apache License 2.0 — Copyright (c) cozmo and jsQR contributors.
+
+See THIRD-PARTY-LICENSES.md in the repository root for full details.

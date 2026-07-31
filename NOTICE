@@ -1,0 +1,33 @@
+QRCode Decode Ultra
+Copyright (c) 2026 Zoe Ying
+
+This product includes third-party software under the Apache License, Version 2.0.
+The Apache-2.0 license requires that these attributions be preserved. Full
+license texts and versions are listed in THIRD-PARTY-LICENSES.md.
+
+--------------------------------------------------------------------------------
+jsQR  (bundled via the `jsqr` package, used by qrcode-decode-ultra)
+  Apache License 2.0
+  Copyright (c) cozmo and jsQR contributors.
+
+--------------------------------------------------------------------------------
+The following apply only to the optional qrcode-decode-ultra-wechat package, which is NOT
+installed by default. They are reproduced here for completeness; the authoritative
+copy ships inside the qrcode-decode-ultra-wechat tarball (packages/wechat/NOTICE and
+packages/wechat/assets/LICENSE).
+
+OpenCV
+  Apache License 2.0
+  Copyright (c) OpenCV contributors.
+
+WeChat QRCode (OpenCV opencv_contrib `wechat_qrcode` module and its model weights
+detect.prototxt / detect.caffemodel / sr.prototxt / sr.caffemodel)
+  Apache License 2.0
+  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+  "Tencent is pleased to support the open source community by making
+   WeChat QRCode available."
+  Source: https://github.com/WeChatCV/opencv_3rdparty (branch: wechat_qrcode)
+
+qr-scanner-wechat (WASM wrapper)
+  MIT License, Copyright (c) 2023 Anthony Fu
+  (which itself embeds the Apache-2.0 OpenCV + WeChat QRCode components above)

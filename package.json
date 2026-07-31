@@ -1,0 +1,22 @@
+{
+  "name": "qrcode-decode-ultra-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fast browser QR scanner — native + jsQR zero-WASM fast path, opt-in OpenCV WeChat tier, Web Worker by default.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.18.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/*\" build",
+    "test": "pnpm -r --filter \"./packages/*\" test",
+    "typecheck": "pnpm -r typecheck",
+    "demo": "pnpm -C apps/demo dev",
+    "benchmark": "pnpm -C benchmark benchmark"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

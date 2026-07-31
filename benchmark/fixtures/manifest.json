@@ -1,0 +1,362 @@
+[
+  {
+    "image": "fixtures/synthetic/images/clean/clean-0.png",
+    "expected": "https://github.com/zoexx/qrcode-decode-ultra",
+    "category": "clean",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "6783a39cc8cae427c831a3e1380547836ab6c197cb7e593d877390b8f96d2abd"
+  },
+  {
+    "image": "fixtures/synthetic/images/clean/clean-1.png",
+    "expected": "QRDU-0001",
+    "category": "clean",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "5d104a772b209eb4181f72a55ef938f04407b4f232fe63338e0d21041629014c"
+  },
+  {
+    "image": "fixtures/synthetic/images/clean/clean-2.png",
+    "expected": "hello qrcode-decode-ultra",
+    "category": "clean",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "04bb8de00e37e404fc7397b65368ab8c7d2b9cfae82d43579fe0d50b7b234ac3"
+  },
+  {
+    "image": "fixtures/synthetic/images/clean/clean-3.png",
+    "expected": "https://example.com/order/8f21c4",
+    "category": "clean",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "b2cb8732d2093c99062e32bec7dfe16a523c5add51e61a20234412af9f269111"
+  },
+  {
+    "image": "fixtures/synthetic/images/clean/clean-4.png",
+    "expected": "ABC-987-XYZ-42",
+    "category": "clean",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "fb20e929a6e0ee0329a77ff0c3038092d58fd93f87e52b354d85bba2071cee0f"
+  },
+  {
+    "image": "fixtures/synthetic/images/rotated/rotated-0.png",
+    "expected": "https://github.com/zoexx/qrcode-decode-ultra",
+    "category": "rotated",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "78e5750861c64d34882358dc98377cd30bed99d5414e3244a411dcac3a8f3c55"
+  },
+  {
+    "image": "fixtures/synthetic/images/rotated/rotated-1.png",
+    "expected": "QRDU-0001",
+    "category": "rotated",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "49fa34b39cf5fabe5ab9775bfb7dd1ca22606210ce5e5de1f0377d076e93a54c"
+  },
+  {
+    "image": "fixtures/synthetic/images/rotated/rotated-2.png",
+    "expected": "hello qrcode-decode-ultra",
+    "category": "rotated",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "6162a0db2db44cbf352e2cb25e83e2d7eaea5193df6416845b63853497c00950"
+  },
+  {
+    "image": "fixtures/synthetic/images/rotated/rotated-3.png",
+    "expected": "https://example.com/order/8f21c4",
+    "category": "rotated",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "ef4ada670804abfc1ea2971ac61fcb316355638c318418ac1857a300d6cdc9c0"
+  },
+  {
+    "image": "fixtures/synthetic/images/rotated/rotated-4.png",
+    "expected": "ABC-987-XYZ-42",
+    "category": "rotated",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "7a9bd87c9f095bfe2cf764b82f411993b44d8c615db86efc441bc91b94c666ce"
+  },
+  {
+    "image": "fixtures/synthetic/images/blur/blur-0.png",
+    "expected": "https://github.com/zoexx/qrcode-decode-ultra",
+    "category": "blur",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "9c9f38c2ffc4cdeafca5423d3eed023faa46497938fdf9f491bd4524b068723b"
+  },
+  {
+    "image": "fixtures/synthetic/images/blur/blur-1.png",
+    "expected": "QRDU-0001",
+    "category": "blur",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "f3d2ca10f295bedcee0c61b21936cc3c3f65f411e4c0c249f112facf6a4b9f06"
+  },
+  {
+    "image": "fixtures/synthetic/images/blur/blur-2.png",
+    "expected": "hello qrcode-decode-ultra",
+    "category": "blur",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "3fad37cc622d87c36e9d796907f47246ad7c2b547109cf7bd0c631c20038f929"
+  },
+  {
+    "image": "fixtures/synthetic/images/blur/blur-3.png",
+    "expected": "https://example.com/order/8f21c4",
+    "category": "blur",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "e075a5f30ae5172ee7779f0685e8eb6ee2d6d821086a49be212c2b32f08bc143"
+  },
+  {
+    "image": "fixtures/synthetic/images/blur/blur-4.png",
+    "expected": "ABC-987-XYZ-42",
+    "category": "blur",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "4190f48b869f2330c0d83084545eb00cbb4fc7561cfb81c7fe8aa95372b350d2"
+  },
+  {
+    "image": "fixtures/synthetic/images/low_light/low_light-0.png",
+    "expected": "https://github.com/zoexx/qrcode-decode-ultra",
+    "category": "low_light",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "6448c2fdbea3662a3fc1f1c03094ac76b4b0256cda98a2a968083ab54cc35b2a"
+  },
+  {
+    "image": "fixtures/synthetic/images/low_light/low_light-1.png",
+    "expected": "QRDU-0001",
+    "category": "low_light",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "d000967aede74a9457d01b83afdb9939a70ffcbf47dc65134c2d62767a8a1432"
+  },
+  {
+    "image": "fixtures/synthetic/images/low_light/low_light-2.png",
+    "expected": "hello qrcode-decode-ultra",
+    "category": "low_light",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "2369a8f0b474d42628dcd4d5743b426151856c54ab57253578fcf3fa27a6819e"
+  },
+  {
+    "image": "fixtures/synthetic/images/low_light/low_light-3.png",
+    "expected": "https://example.com/order/8f21c4",
+    "category": "low_light",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "a85d4a11def8ace480417c304641c17c1ad6555892a9e5eb420c419c54bd834a"
+  },
+  {
+    "image": "fixtures/synthetic/images/low_light/low_light-4.png",
+    "expected": "ABC-987-XYZ-42",
+    "category": "low_light",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "29ba0274c547d657b7ef31a8808d623ddc946a0164e87a811673e641db9e1b4a"
+  },
+  {
+    "image": "fixtures/synthetic/images/inverted/inverted-0.png",
+    "expected": "https://github.com/zoexx/qrcode-decode-ultra",
+    "category": "inverted",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "3e8f69780916324a83933e4be2e61241f4991123986189dc8918e3553a752170"
+  },
+  {
+    "image": "fixtures/synthetic/images/inverted/inverted-1.png",
+    "expected": "QRDU-0001",
+    "category": "inverted",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "b5f27a4da4ee944426f11979c6c5c605f33b51ff8b83f32424f587e0b13d2acc"
+  },
+  {
+    "image": "fixtures/synthetic/images/inverted/inverted-2.png",
+    "expected": "hello qrcode-decode-ultra",
+    "category": "inverted",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "30ec9d80d9f317ae93062bb46d9a91b478022545ad05409179b3b94941546f48"
+  },
+  {
+    "image": "fixtures/synthetic/images/inverted/inverted-3.png",
+    "expected": "https://example.com/order/8f21c4",
+    "category": "inverted",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "8081debd7fed22e5408b6a129f4e579b4d6594ac472e974c91b658287377c71c"
+  },
+  {
+    "image": "fixtures/synthetic/images/inverted/inverted-4.png",
+    "expected": "ABC-987-XYZ-42",
+    "category": "inverted",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "4778473532847d3c2a346d353dc34c909543e76358a759ac5daca75220d45251"
+  },
+  {
+    "image": "fixtures/synthetic/images/downscale_32/downscale_32-0.png",
+    "expected": "https://github.com/zoexx/qrcode-decode-ultra",
+    "category": "downscale_32",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "01f190fb40e9648a6f9347080c4ea74524b96baf0121aa23289fbeff9b5eec67"
+  },
+  {
+    "image": "fixtures/synthetic/images/downscale_32/downscale_32-1.png",
+    "expected": "QRDU-0001",
+    "category": "downscale_32",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "fe4b81a31e778d7f34ba3fc07c7c44fdc799c69688c882d1ec270db099028e6d"
+  },
+  {
+    "image": "fixtures/synthetic/images/downscale_32/downscale_32-2.png",
+    "expected": "hello qrcode-decode-ultra",
+    "category": "downscale_32",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "cffe9b311a23483e92204454563285062fd5e0958688342606274850892dbdf8"
+  },
+  {
+    "image": "fixtures/synthetic/images/downscale_32/downscale_32-3.png",
+    "expected": "https://example.com/order/8f21c4",
+    "category": "downscale_32",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "fb1e5d69cfc49f1573407c428cb34764af096155da76010408fbf7a2438212ec"
+  },
+  {
+    "image": "fixtures/synthetic/images/downscale_32/downscale_32-4.png",
+    "expected": "ABC-987-XYZ-42",
+    "category": "downscale_32",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "55ad05a3452cd69acbbe46baaaae2cd591a1f4521359ec0d63aea7395750f3f0"
+  },
+  {
+    "image": "fixtures/synthetic/images/damaged/damaged-0.png",
+    "expected": "https://github.com/zoexx/qrcode-decode-ultra",
+    "category": "damaged",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "88c11b69a53167842d14bd822fe88f81d69ccdfd14dd16dc954471a5802e76ab"
+  },
+  {
+    "image": "fixtures/synthetic/images/damaged/damaged-1.png",
+    "expected": "QRDU-0001",
+    "category": "damaged",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "a5d408617dbfcb568412ee9ba398854d39d893f07164cb6eb362de02cf6030ea"
+  },
+  {
+    "image": "fixtures/synthetic/images/damaged/damaged-2.png",
+    "expected": "hello qrcode-decode-ultra",
+    "category": "damaged",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "5ccb2036000a519b9bc94eb6c2e99aa8a1b303d32dc62240b697c30cf4771039"
+  },
+  {
+    "image": "fixtures/synthetic/images/damaged/damaged-3.png",
+    "expected": "https://example.com/order/8f21c4",
+    "category": "damaged",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "46f2216fc3051467c5c2164e591b64a30f8d27602af6ca9705be305bb7b35fc8"
+  },
+  {
+    "image": "fixtures/synthetic/images/damaged/damaged-4.png",
+    "expected": "ABC-987-XYZ-42",
+    "category": "damaged",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "5053ec457177104c842913ab6973af36ca81240713e83a1d424542f1c3da5ad4"
+  },
+  {
+    "image": "fixtures/synthetic/images/torture/torture-0.png",
+    "expected": "https://github.com/zoexx/qrcode-decode-ultra",
+    "category": "torture",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "6bae1165a613aa6b09700522b20712d5c0a8410d0a03f5003af531c82bc2c261"
+  },
+  {
+    "image": "fixtures/synthetic/images/torture/torture-1.png",
+    "expected": "QRDU-0001",
+    "category": "torture",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "f247af6769a11fb466101fa926a2f8cd27883b4506a9ff20b7e1785c60c3a1b2"
+  },
+  {
+    "image": "fixtures/synthetic/images/torture/torture-2.png",
+    "expected": "hello qrcode-decode-ultra",
+    "category": "torture",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "46f7402dfda3150d35f9740ceb22e9a9cdac57f7ac199fc5475d5c4759d53295"
+  },
+  {
+    "image": "fixtures/synthetic/images/torture/torture-3.png",
+    "expected": "https://example.com/order/8f21c4",
+    "category": "torture",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "5599f46a6a2aa28439e9866efd66a238bfa8aa12d94bfae2e921a63becfd99c5"
+  },
+  {
+    "image": "fixtures/synthetic/images/torture/torture-4.png",
+    "expected": "ABC-987-XYZ-42",
+    "category": "torture",
+    "format": "qr_code",
+    "source": "synthetic",
+    "license": "Unlicense",
+    "sha256": "337e0c0ecb4ed40c40d2f300ab944a5b318c8dd7b6ed37a5cc1d00f596425b29"
+  }
+]

@@ -1,0 +1,53 @@
+{
+  "name": "qrcode-decode-ultra-wechat",
+  "version": "1.0.0",
+  "description": "Opt-in OpenCV WeChat QRCode engine for QRCode Decode Ultra — high accuracy on hard codes (~2.5MB WASM).",
+  "type": "module",
+  "license": "MIT",
+  "author": "Zoe Ying",
+  "homepage": "https://github.com/zoexx/qrcode-decode-ultra",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zoexx/qrcode-decode-ultra.git",
+    "directory": "packages/wechat"
+  },
+  "bugs": {
+    "url": "https://github.com/zoexx/qrcode-decode-ultra/issues"
+  },
+  "keywords": [
+    "qr",
+    "qrcode",
+    "scanner",
+    "opencv",
+    "wechat",
+    "wasm"
+  ],
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE",
+    "assets"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "qr-scanner-wechat": "0.1.3"
+  },
+  "peerDependencies": {
+    "qrcode-decode-ultra": "workspace:^"
+  },
+  "devDependencies": {
+    "tsup": "8.5.1",
+    "typescript": "^5.7.0"
+  }
+}
