@@ -12,9 +12,13 @@ import { toBitmap, toFrameImage, workerTransportAvailable } from "./normalize.js
 import type {
   Diagnostic,
   EngineId,
+  FrameImage,
   ScanError,
   EngineStatus,
   ImageSource,
+  RaceLane,
+  RaceLeg,
+  RaceReport,
   ScanController,
   Scanner,
   ScannerOptions,
@@ -47,6 +51,8 @@ class QRScanner implements Scanner {
   private readonly lowResPreloadPx: number;
   private readonly useWorker: boolean;
   private readonly wechatRequested: boolean;
+  private readonly raceRequested: boolean;
+  private readonly onRace?: (report: RaceReport) => void;
 
   private client: WorkerClient | null = null;
   private engines: Engine[] | null = null;
@@ -63,6 +69,14 @@ class QRScanner implements Scanner {
    */
   private wechat: Engine | null = null;
   private wechatPreloadStarted = false;
+  /**
+   * Non-null while the strong tier is still loading. A frame dispatched during
+   * that window pays the load as part of its round trip, so the race reports the
+   * leg as `cold` rather than passing a 20-second model download off as a decode
+   * time. The lane still runs — losing a decode to keep a number tidy would be
+   * the wrong trade.
+   */
+  private warmingStrong: Promise<void> | null = null;
   private initPromise: Promise<EngineStatus[]> | null = null;
   private disposed = false;
 
@@ -74,6 +88,8 @@ class QRScanner implements Scanner {
     this.lowResPreloadPx = options.lowResPreloadPx ?? 480;
     this.useWorker = options.worker !== false && workerTransportAvailable();
     this.wechatRequested = this.engineIds.includes("wechat");
+    this.raceRequested = options.race === true;
+    this.onRace = options.onRace;
   }
 
   ready(): Promise<EngineStatus[]> {
@@ -102,6 +118,9 @@ class QRScanner implements Scanner {
       maxCodesPerFrame: this.maxCodesPerFrame,
     });
     const wechatStatus = this.wechatRequested ? await this.initWechatTier() : null;
+    // Racing runs the strong tier from the very first frame, so there is no
+    // "escalation moment" left to preload against — warm it now instead.
+    if (this.raceRequested) this.warmStrongTier();
     return this.mergeWechatStatus(await fastStatuses, wechatStatus);
   }
 
@@ -207,6 +226,12 @@ class QRScanner implements Scanner {
       const escalates = this.wechatClient !== null || this.wechat !== null;
       const frame = escalates ? await toFrameImage(source) : null;
 
+      // Race mode needs two live workers; with only an in-process strong tier
+      // there is nothing to race against, so fall through to the cascade.
+      if (frame && this.raceRequested && this.wechatClient) {
+        return this.decodeRaced(this.client, this.wechatClient, frame, onDiagnostic);
+      }
+
       const bitmap = await toBitmap(frame ?? source);
       if (this.disposed) return [];
       const outcome = await this.client.decode(bitmap);
@@ -245,17 +270,151 @@ class QRScanner implements Scanner {
   }
 
   /**
+   * Both workers, one frame, first real decode wins.
+   *
+   * The two lanes are nowhere near each other in cost — the fast path answers in
+   * single-digit milliseconds, WeChat in ~250ms — so "await both" would hand
+   * every frame back at the slow lane's speed and make racing strictly worse
+   * than the cascade. Instead the caller gets the first hit and the straggler is
+   * left running only to be measured: it reports through `onRace` a second time
+   * when it lands, and its worker is skipped — never queued behind — on any
+   * frame that starts while it is still busy.
+   *
+   * Late results are telemetry only. A code the slow lane finds after the fast
+   * lane already returned belongs to a frame the caller has moved on from, and
+   * delivering it would surface a decode of pixels no longer on screen.
+   */
+  private async decodeRaced(
+    fast: WorkerClient,
+    strong: WorkerClient,
+    frame: FrameImage,
+    onDiagnostic?: (d: Diagnostic) => void,
+  ): Promise<ScanResult[]> {
+    const t0 = now();
+    const fastEngines = this.engineIds.filter((id) => id !== "wechat");
+    const legs = new Map<RaceLane, RaceLeg>([
+      ["fast", { lane: "fast", engines: fastEngines, outcome: "pending" }],
+      ["strong", { lane: "strong", engines: ["wechat"], outcome: "pending" }],
+    ]);
+    let winner: RaceLane | null = null;
+    const emit = (complete: boolean): void => {
+      if (this.disposed) return;
+      this.onRace?.({ legs: [...legs.values()], winner, totalMs: now() - t0, complete });
+    };
+
+    // A dead fast path still has to reach the caller as an error — but only if
+    // the strong lane didn't rescue this frame.
+    let fastError: unknown = null;
+
+    type LaneResult = { lane: RaceLane; results: ScanResult[] };
+
+    const runLane = async (
+      lane: RaceLane,
+      client: WorkerClient,
+      engines: EngineId[],
+      cold: boolean,
+    ): Promise<LaneResult> => {
+      const started = now();
+      try {
+        // Each lane rasterizes its own bitmap from the one frame: the transport
+        // transfers a bitmap and closes it on the far side, so the lanes cannot
+        // share one — but they do share the pixels, which is what makes the two
+        // times comparable at all.
+        const outcome = await client.decode(await toBitmap(frame));
+        outcome.diagnostics.forEach((d) => onDiagnostic?.(d));
+        legs.set(lane, {
+          lane,
+          engines,
+          outcome: outcome.results.length > 0 ? "hit" : "miss",
+          ms: now() - started,
+          engine: outcome.results[0]?.engine,
+          cold: cold || undefined,
+        });
+        return { lane, results: outcome.results };
+      } catch (err) {
+        const detail = toScanError(err, "decode").message;
+        legs.set(lane, { lane, engines, outcome: "error", ms: now() - started, detail, cold: cold || undefined });
+        if (lane === "strong") {
+          // Same policy as the cascade: drop the optional tier and keep scanning
+          // on the healthy fast path rather than failing every later frame.
+          this.wechatClient = null;
+          onDiagnostic?.({ engine: "wechat", kind: "engine-error", detail });
+        } else {
+          fastError = err;
+        }
+        return { lane, results: [] };
+      }
+    };
+
+    const lanes: Promise<LaneResult>[] = [];
+    const dispatch = (lane: RaceLane, client: WorkerClient, engines: EngineId[]): void => {
+      if (client.busy) {
+        legs.set(lane, { lane, engines, outcome: "busy" });
+        return;
+      }
+      // The strong tier's model may still be downloading; a frame dispatched now
+      // wears that load in its round trip.
+      lanes.push(runLane(lane, client, engines, lane === "strong" && this.warmingStrong !== null));
+    };
+    dispatch("fast", fast, fastEngines);
+    dispatch("strong", strong, ["wechat"]);
+
+    // Both lanes still working on older frames: nothing to decode, and nothing
+    // queued. The scanVideo loop simply tries again on the next tick.
+    if (lanes.length === 0) {
+      emit(true);
+      return [];
+    }
+
+    // Settle in arrival order and stop at the first lane that actually decoded.
+    // `runLane` never rejects, so nothing here can leave a rejection unhandled.
+    const remaining = new Map(lanes.map((p, i) => [i, p.then((v) => ({ ...v, index: i }))]));
+    let results: ScanResult[] = [];
+    while (remaining.size > 0) {
+      const settled = await Promise.race(remaining.values());
+      remaining.delete(settled.index);
+      if (settled.results.length > 0) {
+        winner = settled.lane;
+        results = settled.results;
+        break;
+      }
+    }
+
+    if (remaining.size > 0) {
+      // Report what is known now, then again once the straggler lands — that
+      // second report is the actual head-to-head measurement.
+      emit(false);
+      void Promise.all(remaining.values()).then(() => emit(true));
+    } else {
+      emit(true);
+    }
+
+    if (results.length === 0 && fastError !== null) throw fastError;
+    return results;
+  }
+
+  /**
    * Preload-on-low-res: a live frame whose smaller dimension is below the
    * threshold warms the WeChat WASM (idempotent, non-blocking) so the escalation
    * decode doesn't stall on a cold download. Fires at most once per scanner.
    */
   private maybePreloadWechat(width: number, height: number): void {
-    if (this.wechatPreloadStarted || this.lowResPreloadPx <= 0) return;
-    if (!this.wechatClient && !this.wechat) return;
+    if (this.lowResPreloadPx <= 0) return;
     const minDim = Math.min(width, height);
     if (minDim <= 0 || minDim >= this.lowResPreloadPx) return;
+    this.warmStrongTier();
+  }
+
+  /**
+   * Warm the strong tier in the background — idempotent, non-blocking, once per
+   * scanner, and best-effort: if it fails, the cascade simply loads it again
+   * when it gets there.
+   */
+  private warmStrongTier(): void {
+    if (this.wechatPreloadStarted) return;
+    if (!this.wechatClient && !this.wechat) return;
     this.wechatPreloadStarted = true;
-    void (async () => {
+    const warming = (async () => {
       try {
         if (this.wechatClient) {
           await this.wechatClient.preload();
@@ -266,6 +425,11 @@ class QRScanner implements Scanner {
         /* best-effort; the cascade will attempt the load again on escalation */
       }
     })();
+    this.warmingStrong = warming;
+    // Never rejects (the body catches), so this cannot go unhandled.
+    void warming.then(() => {
+      if (this.warmingStrong === warming) this.warmingStrong = null;
+    });
   }
 
   scanVideo(video: HTMLVideoElement, options: ScanVideoOptions): ScanController {

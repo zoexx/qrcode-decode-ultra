@@ -77,6 +77,84 @@ export interface ScannerOptions {
    * 480; set 0 to disable. No effect unless `wechat` is in the engine list.
    */
   lowResPreloadPx?: number;
+  /**
+   * Send every frame to **both** workers at once and take the first real decode,
+   * instead of only escalating to the strong tier on a fast-path miss. Default
+   * false.
+   *
+   * The default cascade is strictly cheaper: it never wakes the WeChat tier for
+   * a frame the fast path already decoded. Racing spends a ~250ms WeChat decode
+   * on every frame to buy two things the cascade cannot give you — a decode for
+   * a hard code in the time the *fastest* engine takes rather than the sum of
+   * the tiers ahead of it, and a per-frame measurement of which tier is actually
+   * winning on this device (`onRace`).
+   *
+   * Requires both workers: the `wechat` tier must be in the engine list, have
+   * registered a worker (`enableWechat()`), and the worker transport must be
+   * available. Anything less and the scanner silently keeps the sequential
+   * cascade — running the strong tier in-process alongside the fast path would
+   * be no race at all, just a blocked main thread.
+   */
+  race?: boolean;
+  /**
+   * Per-frame race telemetry, for both `scanImage` and `scanVideo`. Fires only
+   * while `race` is on, twice per frame when the lanes finish apart (see
+   * `RaceReport.complete`).
+   */
+  onRace?: (report: RaceReport) => void;
+}
+
+/**
+ * Which worker ran one leg of a raced frame.
+ *
+ * - `fast` — core's own worker, running the `native → jsqr` cascade.
+ * - `strong` — the WeChat tier's own worker.
+ */
+export type RaceLane = "fast" | "strong";
+
+/**
+ * `busy` means the lane was skipped because its worker was still decoding an
+ * older frame — the race never queues work behind a slow lane. `pending` only
+ * appears in the provisional report, for the lane that had not answered yet
+ * when the winner was already known.
+ */
+export type RaceLegOutcome = "hit" | "miss" | "error" | "busy" | "pending";
+
+export interface RaceLeg {
+  lane: RaceLane;
+  /** The engines this lane can run, in cascade order. */
+  engines: EngineId[];
+  outcome: RaceLegOutcome;
+  /** Round trip for this lane in ms, measured on the main thread from dispatch
+   * to reply. Absent while `pending`, and for a `busy` lane that never ran. */
+  ms?: number;
+  /** The engine that actually decoded, when `outcome` is `"hit"`. */
+  engine?: EngineId;
+  /**
+   * This lane was still loading its engine when the frame was dispatched, so
+   * `ms` is a one-time setup cost (for `wechat`, the 2.5MB model download) with a
+   * decode on the end of it — not what this lane costs per frame. Treat a cold
+   * leg as unusable for "which tier is faster here".
+   */
+  cold?: boolean;
+  /** Why the lane failed, when `outcome` is `"error"`. */
+  detail?: string;
+}
+
+/** One frame, sent to both workers at once. See `ScannerOptions.race`. */
+export interface RaceReport {
+  legs: RaceLeg[];
+  /** The lane whose results were returned, or `null` if nothing decoded. */
+  winner: RaceLane | null;
+  /** Wall clock from dispatch to the moment this report was emitted. */
+  totalMs: number;
+  /**
+   * `false` for the provisional report emitted the instant a winner is known
+   * while the other lane is still running; `true` once every leg has landed.
+   * A frame therefore reports twice when one lane finishes well after the other
+   * — which is the normal case, and the point of measuring.
+   */
+  complete: boolean;
 }
 
 export interface EngineStatus {

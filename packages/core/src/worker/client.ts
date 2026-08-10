@@ -37,6 +37,14 @@ export class WorkerClient {
    * while the controller still reports `running`.
    */
   private dead: ScanError | null = null;
+  /**
+   * Decodes posted but not yet answered. The race path reads this to skip a lane
+   * whose worker is still chewing on an older frame: the two lanes finish
+   * hundreds of milliseconds apart, so without the check every fast frame would
+   * pile another decode into the slow worker's message queue — a backlog that
+   * only grows, and answers about frames long gone.
+   */
+  private decodesInFlight = 0;
 
   /**
    * @param workerFactory spawns the worker to drive. Defaults to core's own
@@ -83,6 +91,11 @@ export class WorkerClient {
     return this.dead !== null || this.disposing;
   }
 
+  /** True while a decode is in flight. See `decodesInFlight`. */
+  get busy(): boolean {
+    return this.decodesInFlight > 0;
+  }
+
   private send<T>(message: MainToWorker, transfer?: Transferable[]): Promise<T> {
     // Fail fast rather than posting into a dead or terminating worker. `disposing`
     // is checked too: dispose() can land between a caller resolving `this.client`
@@ -111,7 +124,15 @@ export class WorkerClient {
   }
 
   decode(bitmap: ImageBitmap): Promise<DecodeOutcome> {
-    return this.send<DecodeOutcome>({ type: "decode", id: this.nextId++, bitmap }, [bitmap]);
+    this.decodesInFlight++;
+    const pending = this.send<DecodeOutcome>({ type: "decode", id: this.nextId++, bitmap }, [bitmap]);
+    const settle = (): void => {
+      this.decodesInFlight--;
+    };
+    // Both branches are handled here, so this bookkeeping chain can never
+    // surface as an unhandled rejection; the caller still gets `pending` itself.
+    void pending.then(settle, settle);
+    return pending;
   }
 
   async dispose(): Promise<void> {

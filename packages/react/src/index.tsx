@@ -5,6 +5,7 @@ import type {
   EngineId,
   EnginePreset,
   Scanner as CoreScanner,
+  RaceReport,
   ScanController,
   ScanError,
   ScanResult,
@@ -26,6 +27,12 @@ export interface UseScannerOptions {
   maxCodesPerFrame?: number;
   /** Low-res frame threshold (px) that eagerly preloads the WeChat tier. Default 480. */
   lowResPreloadPx?: number;
+  /**
+   * Send each frame to both workers at once and take the first real decode,
+   * instead of escalating to the WeChat tier only on a fast-path miss. Default
+   * false. Needs the `wechat` tier enabled; see `ScannerOptions.race`.
+   */
+  race?: boolean;
   /** Which camera to request. Default "environment" (rear). */
   facingMode?: "environment" | "user";
   /** Specific camera device id (overrides facingMode). */
@@ -38,6 +45,8 @@ export interface UseScannerOptions {
   /** All codes found in a frame (many-codes-per-frame). Fires alongside `onResult`. */
   onResults?: (results: ScanResult[]) => void;
   onError?: (error: ScanError) => void;
+  /** Per-frame race telemetry. Fires only while `race` is on. */
+  onRace?: (report: RaceReport) => void;
 }
 
 export type ScannerStatus = "idle" | "requesting" | "scanning" | "stopped" | "error";
@@ -50,6 +59,12 @@ export interface UseScannerReturn {
   result: ScanResult | null;
   /** Every code from the most recent successful frame (many-codes-per-frame). */
   results: ScanResult[];
+  /**
+   * The most recent race report, when `race` is on. Updates twice per frame once
+   * the lanes finish apart — provisional the moment a winner is known, then
+   * complete when the slower lane lands. Always `null` with `race` off.
+   */
+  race: RaceReport | null;
   error: ScanError | null;
   isScanning: boolean;
   start: () => Promise<void>;
@@ -71,6 +86,7 @@ export function useScanner(options: UseScannerOptions = {}): UseScannerReturn {
   const [status, setStatus] = useState<ScannerStatus>("idle");
   const [result, setResult] = useState<ScanResult | null>(null);
   const [results, setResults] = useState<ScanResult[]>([]);
+  const [race, setRace] = useState<RaceReport | null>(null);
   const [error, setError] = useState<ScanError | null>(null);
 
   // Latest options/callbacks without re-triggering the lifecycle effect.
@@ -137,6 +153,11 @@ export function useScanner(options: UseScannerOptions = {}): UseScannerReturn {
           maxScansPerSecond: o.maxScansPerSecond,
           maxCodesPerFrame: o.maxCodesPerFrame,
           lowResPreloadPx: o.lowResPreloadPx,
+          race: o.race,
+          onRace: (r) => {
+            setRace(r);
+            optsRef.current.onRace?.(r);
+          },
         });
       }
 
@@ -187,6 +208,7 @@ export function useScanner(options: UseScannerOptions = {}): UseScannerReturn {
     status,
     result,
     results,
+    race,
     error,
     isScanning: status === "scanning",
     start,
@@ -217,4 +239,13 @@ export function Scanner(props: ScannerProps) {
   );
 }
 
-export type { ScanResult, ScanError, BarcodeFormat, EngineId, EnginePreset } from "qrcode-decode-ultra";
+export type {
+  ScanResult,
+  ScanError,
+  BarcodeFormat,
+  EngineId,
+  EnginePreset,
+  RaceReport,
+  RaceLeg,
+  RaceLane,
+} from "qrcode-decode-ultra";
