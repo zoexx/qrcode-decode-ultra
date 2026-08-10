@@ -7,6 +7,13 @@ A browser **QR scanner** that decodes clean codes at jsQR speed with **zero
 WASM**, runs **off the main thread**, and escalates to an **opt-in OpenCV WeChat
 super-resolution tier** only for the codes the fast path misses.
 
+![A QR code on a phone screen, read from a live webcam. A meter beside the video compares the fast worker against the WeChat worker frame by frame, showing which one decoded first and how long each took.](docs/demo.gif)
+
+<sup>**Race mode** (opt-in) — the same frame goes to both workers at once and the
+first real decode wins, so you can see which tier gets there first on your own
+hardware. It is a measuring tool, not the default: normally the tiers *cascade*,
+and the WeChat worker never wakes for a code `jsqr` already read.</sup>
+
 ```bash
 npm i qrcode-decode-ultra              # core — zero WASM, framework-agnostic
 npm i qrcode-decode-ultra-react        # optional: useScanner() + <Scanner/>
@@ -86,6 +93,12 @@ flowchart TD
 - **Backpressure, not a queue.** One in-flight decode at a time; a frame arriving
   mid-decode is dropped rather than queued, so the scanner never works on stale
   video.
+- **Or race the two workers instead.** `race: true` sends each frame to both
+  workers at once and takes the first real decode, so a hard code costs the
+  *fastest* tier's time rather than the sum of the tiers ahead of it. Opt-in,
+  because it spends a ~250 ms WeChat decode on every frame instead of only the
+  missed ones. `onRace` reports both lanes' times per frame — which is how you
+  find out which tier actually wins on a given device.
 
 For the transport split, worker protocol, and `Engine` contract, see
 [`DESIGN.md`](DESIGN.md).

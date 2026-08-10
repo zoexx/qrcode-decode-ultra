@@ -1,0 +1,858 @@
+/*
+ * Dark studio theme for the demo. Built to be read on video: large type, high
+ * contrast, and the per-engine colours kept identical everywhere they appear
+ * (chips, race bars, the box drawn over a decoded code) so "who won" is legible
+ * at a glance and at low bitrate.
+ */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #0a0c10;
+  --panel: #12161d;
+  --panel-2: #171d26;
+  --line: #232b37;
+  --line-soft: #1b2029;
+
+  --text: #e8eef6;
+  --text-dim: #94a2b5;
+  --text-faint: #66717f;
+
+  /* Keyed to what each tier costs: blue = free (platform), green = cheap
+     (~30KB JS), amber = the heavy 2.5MB escalation. */
+  --native: #6aa5ff;
+  --native-soft: rgba(106, 165, 255, 0.14);
+  --jsqr: #4ade80;
+  --jsqr-soft: rgba(74, 222, 128, 0.14);
+  --wechat: #fbbf4c;
+  --wechat-soft: rgba(251, 191, 76, 0.14);
+  --danger: #ff7a7a;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  background-image: radial-gradient(900px 460px at 50% -12%, rgba(106, 165, 255, 0.1), transparent 72%);
+  background-repeat: no-repeat;
+}
+
+.shell {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 28px 22px 60px;
+}
+
+/* Brand and tagline on the left, tabs and preset on the right — one band, so
+   the stage starts as high up the screen as possible. Wraps to two rows once
+   the window is too narrow to hold both. */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px 20px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.headings {
+  min-width: 0;
+  margin-right: auto;
+}
+
+/* --- masthead ------------------------------------------------------------ */
+
+.masthead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex: none;
+}
+
+.dot[data-live="true"] {
+  background: var(--jsqr);
+  box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.55);
+  animation: pulse 2s infinite;
+}
+
+.dot[data-live="error"] {
+  background: var(--danger);
+}
+
+@keyframes pulse {
+  70% {
+    box-shadow: 0 0 0 7px rgba(74, 222, 128, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+  }
+}
+
+h1 {
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.tagline {
+  color: var(--text-dim);
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin: 5px 0 0 19px;
+  max-width: 64ch;
+}
+
+.tagline code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+/* --- controls ------------------------------------------------------------ */
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 550;
+  padding: 6px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.14s, color 0.14s;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab[aria-selected="true"] {
+  background: var(--panel-2);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.select {
+  appearance: none;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px 30px 8px 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
+    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 55%, calc(100% - 10px) 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.select:focus-visible,
+.tab:focus-visible,
+.toggle:has(input:focus-visible) {
+  outline: 2px solid var(--native);
+  outline-offset: 1px;
+}
+
+/* --- screen recorder ----------------------------------------------------- */
+
+.rec {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.rec-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  padding: 8px 14px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: border-color 0.14s, background 0.14s, color 0.14s;
+}
+
+.rec-btn:hover:not(:disabled) {
+  border-color: rgba(255, 122, 122, 0.5);
+}
+
+.rec-btn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.rec-btn:focus-visible {
+  outline: 2px solid var(--native);
+  outline-offset: 1px;
+}
+
+.rec-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+  flex: none;
+}
+
+.rec-btn[data-on] {
+  border-color: rgba(255, 122, 122, 0.55);
+  background: rgba(255, 122, 122, 0.1);
+  color: var(--danger);
+}
+
+.rec-btn[data-on] .rec-dot {
+  animation: rec-blink 1.4s ease-in-out infinite;
+}
+
+@keyframes rec-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+.rec-err {
+  color: var(--danger);
+  font-size: 11.5px;
+  max-width: 24ch;
+}
+
+/* Stacked by default; two columns once the window can hold them (see the
+   one-screen block at the bottom of this file). */
+.layout {
+  min-width: 0;
+}
+
+.panel-top {
+  margin-bottom: 18px;
+}
+
+.panel-top > :last-child {
+  margin-bottom: 0;
+}
+
+.toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-bottom: 20px;
+}
+
+.toggle {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  font-size: 13.5px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle input {
+  accent-color: var(--native);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  flex: none;
+  transform: translateY(2px);
+}
+
+.toggle[data-disabled="true"] {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.toggle .hint {
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+
+.note {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  line-height: 1.6;
+  margin: 0 0 16px 24px;
+  max-width: 56ch;
+}
+
+.note code {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+}
+
+/* --- stage --------------------------------------------------------------- */
+
+.stage {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #05070a;
+  border: 1px solid var(--line);
+  line-height: 0;
+  margin-bottom: 8px;
+  /* A <video> with no stream collapses to its 300x150 intrinsic size; hold the
+     frame open so the page doesn't jump when the camera comes up. */
+  min-height: 260px;
+}
+
+.stage[data-hit="true"] {
+  border-color: rgba(74, 222, 128, 0.5);
+  box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.18), 0 0 34px rgba(74, 222, 128, 0.09);
+}
+
+.stage video,
+.stage img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 62vh;
+  object-fit: contain;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.stage-empty,
+.stage-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: center;
+  padding: 24px;
+}
+
+.stage-empty {
+  aspect-ratio: 4 / 3;
+}
+
+/* Sits over the <video>, which stays mounted so its ref survives. */
+.stage-placeholder {
+  position: absolute;
+  inset: 0;
+}
+
+.statusline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
+  letter-spacing: 0.02em;
+  margin: 0 2px 22px;
+  min-height: 16px;
+}
+
+.statusline .err {
+  color: var(--danger);
+}
+
+/* --- engine chips + cascade legend --------------------------------------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.chip[data-engine="native"] {
+  color: var(--native);
+  background: var(--native-soft);
+  border-color: rgba(106, 165, 255, 0.3);
+}
+
+.chip[data-engine="jsqr"] {
+  color: var(--jsqr);
+  background: var(--jsqr-soft);
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.chip[data-engine="wechat"] {
+  color: var(--wechat);
+  background: var(--wechat-soft);
+  border-color: rgba(251, 191, 76, 0.3);
+}
+
+.chip[data-dim="true"] {
+  color: var(--text-faint);
+  background: transparent;
+  border-color: var(--line);
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 20px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.legend .arrow {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+/* --- race meter ---------------------------------------------------------- */
+
+.race {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 15px 16px 16px;
+  margin-bottom: 20px;
+}
+
+.race-head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin-bottom: 14px;
+}
+
+.race-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.race-sub {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.tally {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.tally b {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.lane {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr) 60px 40px;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 0;
+}
+
+.lane-label {
+  display: flex;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.lane-track {
+  position: relative;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.lane-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  transition: width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lane[data-lane="fast"] .lane-fill {
+  background: linear-gradient(90deg, var(--native), var(--jsqr));
+}
+
+.lane[data-lane="strong"] .lane-fill {
+  background: linear-gradient(90deg, rgba(251, 191, 76, 0.65), var(--wechat));
+}
+
+/* Still running: an indeterminate sweep, because there is no time to show yet. */
+.lane[data-state="pending"] .lane-fill {
+  width: 32% !important;
+  opacity: 0.5;
+  animation: sweep 1.05s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  0% {
+    transform: translateX(-105%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.lane[data-state="miss"] .lane-fill {
+  opacity: 0.32;
+}
+
+.lane[data-state="busy"] .lane-fill,
+.lane[data-state="error"] .lane-fill {
+  width: 0 !important;
+}
+
+.lane[data-state="busy"] .lane-label,
+.lane[data-state="busy"] .lane-ms {
+  opacity: 0.42;
+}
+
+.lane-ms {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.lane-ms span {
+  color: var(--text-faint);
+  font-size: 11px;
+  margin-left: 2px;
+}
+
+.lane-ms[data-muted="true"] {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.lane-flag {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-align: right;
+  color: transparent;
+}
+
+.lane[data-winner="true"] .lane-flag {
+  color: var(--jsqr);
+}
+
+/* Cold: real, but not a decode time. Shown greyed so it doesn't read as a loss. */
+.lane[data-cold="true"] .lane-flag {
+  color: var(--text-faint);
+}
+
+.lane[data-cold="true"] .lane-fill {
+  opacity: 0.28;
+}
+
+.lane[data-cold="true"] .lane-ms {
+  color: var(--text-faint);
+}
+
+.lane[data-state="error"] .lane-flag {
+  color: var(--danger);
+}
+
+.race-foot {
+  color: var(--text-faint);
+  font-size: 11.5px;
+  line-height: 1.55;
+  margin: 11px 0 0;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 10px;
+}
+
+.race-foot b {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+/* --- results ------------------------------------------------------------- */
+
+.count {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+
+.count span {
+  font-weight: 400;
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+
+.result {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 13px 15px;
+  margin-bottom: 9px;
+}
+
+.result-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 11px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.result-time {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-row {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 2px 0;
+}
+
+.result-row dt {
+  color: var(--text-faint);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-top: 2px;
+}
+
+.result-row dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  word-break: break-all;
+}
+
+dl {
+  margin: 0;
+}
+
+/* --- file picker --------------------------------------------------------- */
+
+.picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--panel);
+  border: 1px dashed var(--line);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  padding: 11px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-bottom: 18px;
+  transition: border-color 0.14s, background 0.14s;
+}
+
+.picker:hover {
+  border-color: var(--native);
+  background: var(--panel-2);
+}
+
+.picker input {
+  display: none;
+}
+
+.pickrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.samples {
+  color: var(--text-faint);
+  font-size: 12.5px;
+  margin-bottom: 18px;
+}
+
+.samples button {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--native);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.samples button:hover {
+  color: var(--text);
+}
+
+/*
+ * One-screen layout. Wide enough for a rail beside the stage, and tall enough
+ * that squeezing everything into the viewport still leaves a usable stage —
+ * below either threshold the page falls back to the stacked, scrolling column.
+ *
+ * The shell is pinned to the viewport and the two columns each manage their own
+ * overflow, so the page itself never scrolls: the stage takes whatever height is
+ * left over, and a long run of results scrolls inside the rail.
+ */
+@media (min-width: 980px) and (min-height: 560px) {
+  body {
+    min-height: 0;
+  }
+
+  .shell {
+    max-width: 1260px;
+    height: 100dvh;
+    padding: 22px 26px;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .topbar {
+    margin-bottom: 0;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 400px;
+    gap: 22px;
+    min-height: 0;
+  }
+
+  .stage-col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* The one element that absorbs the leftover height. */
+  .stage {
+    flex: 1;
+    min-height: 0;
+    margin-bottom: 0;
+  }
+
+  .stage video,
+  .stage img {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    object-fit: contain;
+  }
+
+  .stage-empty {
+    aspect-ratio: auto;
+    height: 100%;
+  }
+
+  .statusline {
+    margin: 10px 2px 0;
+  }
+
+  .side {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .race,
+  .legend {
+    margin-bottom: 16px;
+  }
+
+  .results {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+    /* Room for the card borders not to clip against the scroll edge. */
+    padding-right: 2px;
+  }
+
+  .result:last-child {
+    margin-bottom: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .lane {
+    grid-template-columns: 92px 1fr 60px 34px;
+    gap: 8px;
+  }
+  .tagline,
+  .note {
+    margin-left: 0;
+  }
+}

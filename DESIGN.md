@@ -167,6 +167,53 @@ bitmap and closes it on the far side, so a caller-supplied `ImageBitmap` is
 cloned before it is sent; only bitmaps the library created itself (e.g. decoded
 from a `Blob`) are closed.
 
+### Racing the two workers
+
+`race: true` sends every frame to **both** workers at once instead of consulting
+the strong tier only on a fast-path miss. The first real decode wins and returns;
+nothing waits for the other lane.
+
+The default stays the sequential cascade, because racing is not free: the WeChat
+tier decodes every frame rather than only the ones the fast path missed, and that
+decode costs ~250 ms of CPU whether or not it was needed. What it buys is a hard
+code decoded in the *fastest* tier's time rather than the sum of the tiers ahead
+of it, plus a per-frame measurement — `onRace` — of which tier is actually
+winning on this device.
+
+Five rules make it work rather than merely run:
+
+- **One rasterization, two bitmaps.** The lanes share the frame's pixels (the
+  same fairness invariant as the benchmark), but each needs its own
+  `ImageBitmap`, because the transport transfers a bitmap and closes it on the
+  far side.
+- **First hit wins; the loser is measured, not awaited.** The lanes finish
+  hundreds of milliseconds apart, so "await both" would hand every frame back at
+  the slow lane's speed and make racing strictly worse than the cascade. The
+  straggler runs on only to be timed: `onRace` fires twice, once provisionally
+  when the winner is known and once complete when the last leg lands.
+- **Late results are telemetry, never delivered.** A code the slow lane finds
+  after the fast lane already returned belongs to a frame the caller has moved
+  on from; surfacing it would report a decode of pixels no longer on screen.
+- **A busy lane is skipped, never queued.** `WorkerClient` tracks decodes in
+  flight, and a lane whose worker is still on an older frame is reported `busy`
+  and left alone — otherwise every fast frame would pile another decode into the
+  slow worker's message queue, a backlog that only grows.
+- **A cold lane is flagged, not hidden.** A frame dispatched while the 2.5 MB
+  model is still downloading wears that load in its round trip. The lane still
+  runs — dropping a decode to keep a number tidy is the wrong trade — but the leg
+  is marked `cold`, so a 20-second model load is never passed off as a decode
+  time. Race mode also warms the strong tier at init, since racing leaves no
+  "escalation moment" for preload-on-low-res to fire at.
+
+Failure policy is the cascade's, unchanged: a dead strong lane is dropped and
+scanning continues on the fast path; a dead fast lane surfaces as a `ScanError`,
+but only if the strong lane didn't rescue that frame.
+
+Racing needs two live workers. With `worker: false`, no worker transport, or a
+tier that registered an engine but no worker, `race` is ignored and the
+sequential cascade runs — racing an in-process engine against a worker is not a
+race, just a blocked main thread.
+
 ## 4. More than one code per frame
 
 `native` returns every code it sees in one pass. The other two decode one code

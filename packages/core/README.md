@@ -104,8 +104,46 @@ createScanner({
   lowResPreloadPx: 480,     // when WeChat is enabled, eagerly preload its WASM once
                             // a live-video frame's smaller dimension drops below this
                             // many pixels (non-blocking); 0 disables. default 480
+  race: false,              // send each frame to BOTH workers at once and take the
+                            // first real decode, instead of escalating only on a miss
+  onRace: (report) => {},   // per-frame race telemetry (only fires while race is on)
 });
 ```
+
+### Racing both workers
+
+By default the WeChat tier is only consulted when the fast path misses. With
+`race: true` both workers get the same frame at the same time and the first real
+decode returns — so a hard code costs the *fastest* tier's time instead of the
+sum of the tiers ahead of it.
+
+It is opt-in because it is not free: WeChat decodes every frame (~250 ms of CPU
+each) rather than only the ones that needed it. Needs the `wechat` tier enabled
+and a worker transport; otherwise it is ignored and the cascade runs.
+
+```ts
+const scanner = createScanner({
+  engines: "max-accuracy",
+  race: true,
+  onRace: (report) => {
+    // Fires twice per frame when the lanes finish apart: once the instant a
+    // winner is known, then again (complete: true) when the slower lane lands.
+    if (!report.complete) return;
+    for (const leg of report.legs) {
+      // outcome: hit | miss | error | busy | pending
+      // `busy`  — that worker was still on an older frame, so it was skipped.
+      // `cold`  — its time includes a one-time model load, not just a decode.
+      console.log(leg.lane, leg.engines.join("+"), leg.outcome, leg.ms, leg.cold ? "(cold)" : "");
+    }
+    console.log("winner:", report.winner); // "fast" | "strong" | null
+  },
+});
+```
+
+The winning lane's results are returned immediately; the slower lane keeps
+running only to be timed, and anything it finds afterwards is reported through
+`onRace` but never delivered as a result — it belongs to a frame you have already
+moved past.
 
 ## API
 

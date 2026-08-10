@@ -3,7 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0a0c10" />
     <title>QRCode Decode Ultra demo</title>
+    <style>
+      /* Paint the page background before the CSS bundle lands, so a reload in a
+         screen recording never flashes white. */
+      html {
+        background: #0a0c10;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
