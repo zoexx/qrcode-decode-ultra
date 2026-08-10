@@ -59,8 +59,42 @@ code from that frame. How many you get depends on which cascade tier won — see
 
 Beyond the camera options above (`facingMode`, `deviceId`, `once`, `autoStart`),
 the hook accepts the same scanner options as core — `engines`, `formats`,
-`worker`, `maxScansPerSecond`, `lowResPreloadPx` — and passes them straight
-through.
+`worker`, `maxScansPerSecond`, `lowResPreloadPx`, `maxCodesPerFrame`, `race` —
+and passes them straight through.
+
+## Racing both workers
+
+`race: true` sends each frame to the fast worker and the WeChat worker at the
+same time instead of escalating between them, and the first real decode wins.
+The hook surfaces the timings as `race`, and also calls `onRace` if you pass one:
+
+```tsx
+const { videoRef, results, race } = useScanner({
+  engines: "max-accuracy",   // racing needs the strong tier enabled
+  race: true,
+});
+
+// `race` is the latest report, re-rendered as each lane lands.
+return (
+  <>
+    <video ref={videoRef} playsInline muted autoPlay />
+    {race?.legs.map((leg) => (
+      <p key={leg.lane}>
+        {leg.engines.join("+")} — {leg.outcome} {leg.ms?.toFixed(1)}ms
+        {leg.cold && " (still loading its model)"}
+      </p>
+    ))}
+    {race?.complete && <p>winner: {race.winner}</p>}
+  </>
+);
+```
+
+It is opt-in because it is not free — WeChat then decodes every frame rather
+than only the ones the fast path missed — and it needs
+`qrcode-decode-ultra-wechat` enabled and a worker transport. Without those the
+cascade runs instead. See
+[racing both workers](https://github.com/zoexx/qrcode-decode-ultra/tree/main/packages/core#racing-both-workers)
+for what the report contains and why it can arrive twice per frame.
 
 ## SSR / Next.js
 
