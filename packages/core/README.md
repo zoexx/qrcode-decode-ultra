@@ -39,7 +39,7 @@ await scanner.dispose();
 | Engine | Backing | Payload | Notes |
 |--------|---------|---------|-------|
 | `native` | platform `BarcodeDetector` | 0 | probed before trust — it can be present-but-broken or polyfill-shadowed; absent on Windows/Linux/iOS/Firefox |
-| `jsqr` | jsQR (pure JS) | ~30 KB | clean QR decodes here with **no WASM load** |
+| `jsqr` | jsQR (pure JS) | ~45 KB gzipped | clean QR decodes here with **no WASM load** |
 | `wechat` | OpenCV WeChat (CNN + super-resolution) | ~2.5 MB WASM | opt-in strong tier for low-res / small / blurry codes; separate package, runs in its own worker, lazy-loaded |
 
 First-hit-wins: the first engine to decode anything returns immediately. Each

@@ -64,7 +64,7 @@ export function renderMarkdown(report: BenchReport): string {
   }
   lines.push("");
   lines.push(
-    "> Native `BarcodeDetector` is reported `n/a` here because there is no platform backend off-browser; it is not a loss. The honest comparison the cascade lives in is the WASM/JS one above. The WeChat tier's value is its per-category win on hard codes (blur / low-light / downscale / torture) weighed against its cold-start cost.",
+    "> Native `BarcodeDetector` is reported `n/a` here because there is no platform backend off-browser; it is not a loss. The honest comparison the cascade lives in is the WASM/JS one above. The WeChat tier's value is its per-category win on the hard columns (downscale / damaged / torture) weighed against its cold-start cost — the fast path already saturates clean, rotated, blur, low-light and inverted.",
   );
   return lines.join("\n");
 }

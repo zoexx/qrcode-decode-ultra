@@ -12,7 +12,7 @@ cascade skips an engine that can't handle any requested format.
 | Order | Engine id | Backing | Payload | Role |
 |-------|-----------|---------|---------|------|
 | 0 | `native` | platform `BarcodeDetector` | 0 | zero-payload fast path, where it genuinely works |
-| 1 | `jsqr` | `jsqr` (pure JS) | ~30 KB JS | the happy path for clean QR; no WASM at all |
+| 1 | `jsqr` | `jsqr` (pure JS) | ~45 KB gzipped | the happy path for clean QR; no WASM at all |
 | 2 | `wechat` | `qr-scanner-wechat` (OpenCV) | ~2.5 MB WASM | opt-in strong tier for low-res / hard codes; separate package |
 
 **First-hit-wins.** The first engine to decode anything returns, and no later
@@ -35,8 +35,10 @@ synthetic QR (`probe-image.ts`) and checks `BarcodeDetector.toString()` for
 `[native code]`. If either check fails, native drops out and `jsqr` becomes the
 de-facto first tier. On Windows / Linux / iOS / Firefox native is simply absent.
 
-Where native *is* real it is the strongest and cheapest tier at once, because it
-is not a reimplementation: Chromium's macOS backend calls Apple's Vision
+Where native *is* real it is the cheapest tier and stronger than the `jsqr` tier
+behind it — though not stronger than `wechat`, which still wins the `downscale_32`
+and `torture` categories in `pnpm benchmark:browser`. It earns that because it is
+not a reimplementation: Chromium's macOS backend calls Apple's Vision
 framework (`VNDetectBarcodesRequest`), and on Android the same API rides Google
 Play Services / ML Kit. There is no portable artifact to vendor from either — you
 can only call them — which is exactly why the cascade probes for them and lets
