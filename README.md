@@ -47,9 +47,15 @@ step, so the common case never pays for the hard case.
 ```mermaid
 flowchart TD
     F(["frame — Blob · video · canvas · ImageBitmap"])
-    N["1 · native<br/>platform BarcodeDetector<br/>0 KB · every code in frame"]
-    J["2 · jsQR<br/>pure JavaScript<br/>~30 KB · no WASM"]
-    W["3 · WeChat<br/>OpenCV CNN + super-resolution<br/>~2.5 MB gzipped"]
+    N["`1 · native
+    platform BarcodeDetector
+    0 KB · every code in frame`"]
+    J["`2 · jsQR
+    pure JavaScript
+    ~30 KB · no WASM`"]
+    W["`3 · WeChat
+    OpenCV CNN + super-resolution
+    ~2.5 MB gzipped`"]
     R(["ScanResult[]"])
 
     subgraph fast ["fast worker — default, zero WASM"]
