@@ -1,6 +1,6 @@
 {
   "name": "qrcode-decode-ultra",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Fast browser QR scanner core — native → jsQR zero-WASM fast path with an opt-in OpenCV WeChat tier, Web Worker by default.",
   "type": "module",
   "license": "MIT",
