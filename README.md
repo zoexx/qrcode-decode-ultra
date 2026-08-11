@@ -9,31 +9,25 @@ super-resolution tier** only for the codes the fast path misses.
 
 ![A QR code on a phone screen, read from a live webcam. A meter beside the video compares the fast worker against the WeChat worker frame by frame, showing which one decoded first and how long each took.](docs/demo.gif)
 
-<sup>**Race mode** (opt-in) — the same frame goes to both workers at once and the
-first real decode wins, so you can see which tier gets there first on your own
-hardware. It is a measuring tool, not the default: normally the tiers *cascade*,
-and the WeChat worker never wakes for a code `jsqr` already read.</sup>
+<sup>**Race mode** (opt-in) sends the same frame to both workers at once so you
+can see which tier wins on your own hardware. It is a measuring tool, not the
+default: normally the tiers *cascade*, and the WeChat worker never wakes for a
+code `jsqr` already read.</sup>
 
 ```bash
 npm i qrcode-decode-ultra              # core — zero WASM, framework-agnostic
 npm i qrcode-decode-ultra-react        # optional: useScanner() + <Scanner/>
-npm i qrcode-decode-ultra-wechat       # optional: the 2.5 MB strong tier
+npm i qrcode-decode-ultra-wechat       # optional: strong tier, ~2.5 MB gzipped
 ```
 
 ## The problem
 
-Browser QR scanning makes you pick one:
-
-- **Fast and tiny, but brittle.** jsQR is ~30 KB of pure JS and reads a clean,
-  well-lit code instantly. It misses the codes people actually photograph —
-  small, far away, motion-blurred, badly lit.
-- **Accurate, but heavy for everyone.** The engines that *do* read those codes
-  are megabytes of WASM, downloaded by every user on every visit — including the
-  majority scanning a crisp code at arm's length.
-- **Blocking.** Most scanners run the decode loop on the main thread, so the UI
-  stutters while the camera is live.
-- **One code per frame.** A sheet of labels or a wall of tickets becomes one
-  scan per code.
+Browser QR scanning makes you pick up front. jsQR is ~45 KB gzipped of pure JS and reads
+a clean, well-lit code instantly — but it misses the codes people actually
+photograph: small, far away, motion-blurred, badly lit. The engines that *do*
+read those are megabytes of WASM, downloaded by every visitor including the
+majority scanning a crisp code at arm's length. And most scanners run the decode
+loop on the main thread, so the UI stutters while the camera is live.
 
 You can't pick correctly up front, because which tier a frame *needs* is only
 knowable after the cheap one has failed. So don't pick — cascade.
@@ -52,7 +46,7 @@ flowchart TD
     0 KB · every code in frame`"]
     J["`2 · jsQR
     pure JavaScript
-    ~30 KB · no WASM`"]
+    ~45 KB gzipped · no WASM`"]
     W["`3 · WeChat
     OpenCV CNN + super-resolution
     ~2.5 MB gzipped`"]
@@ -75,36 +69,33 @@ flowchart TD
     W --> R
 ```
 
-- **The default install is zero-WASM.** `native + jsQR` only. The WeChat tier
-  lives in a package you install separately, so its payload is never in a default
-  bundle.
-- **Nothing heavy touches the main thread by default.** The two tiers run in two
-  workers. Measured in headless Chromium on an escalated decode: on the main
-  thread it blocks for a ~290 ms task and drops 17 animation frames; in workers,
-  no long task at all and zero frames dropped. The main thread only rasterizes
-  the frame and routes it. (`worker: false`, or an environment without
-  `Worker`/`OffscreenCanvas`, falls back to in-process — see
-  [`DESIGN.md`](DESIGN.md).)
-- **Native is probed, not trusted.** `'BarcodeDetector' in self` isn't enough:
-  the constructor can exist while `detect()` silently returns `[]`, and an
-  unrelated ponyfill can shadow it. So the engine runs a live decode of a
-  baked-in synthetic QR and checks for `[native code]` before it's allowed to
-  win. Where it is real (Android Chrome, Chromium on macOS/ChromeOS) it is both
-  the strongest and the cheapest tier — Chromium's macOS backend calls Apple's
-  Vision framework, Android's rides ML Kit.
+- **The default install is zero-WASM.** `native + jsQR` only; the WeChat tier is
+  a package you install separately, so its payload is never in a default bundle.
+- **Nothing heavy touches the main thread by default.** Both tiers run in
+  workers; the main thread only rasterizes the frame and routes it. Measured in
+  headless Chromium on an escalated decode: on the main thread, a ~290 ms
+  blocking task and 17 dropped animation frames; in workers, no long task and no
+  dropped frames. (`worker: false`, or no `Worker`/`OffscreenCanvas`, falls back
+  to in-process — see [`DESIGN.md`](DESIGN.md).)
+- **Native is probed, not trusted.** `'BarcodeDetector' in self` isn't enough —
+  the constructor can exist while `detect()` silently returns `[]`, and a
+  ponyfill can shadow it — so the engine decodes a baked-in synthetic QR and
+  checks for `[native code]` before native may win. Where it is real (Android
+  Chrome, Chromium on macOS/ChromeOS) it is cheaper *and* stronger than the jsQR
+  tier behind it: Chromium's macOS backend calls Apple's Vision framework,
+  Android's rides ML Kit. Not the strongest tier overall — see `downscale_32`
+  below.
 - **The escalation warms itself.** A live frame whose smaller dimension drops
-  below `lowResPreloadPx` (default 480) kicks off the WeChat load in the
-  background, so the 2.5 MB is already resident on the frame that finally needs
-  it instead of stalling on a cold download.
+  below `lowResPreloadPx` (default 480) starts the WeChat load in the background,
+  so it is in flight — usually done — before the frame that needs it.
 - **Backpressure, not a queue.** One in-flight decode at a time; a frame arriving
-  mid-decode is dropped rather than queued, so the scanner never works on stale
-  video.
-- **Or race the two workers instead.** `race: true` sends each frame to both
-  workers at once and takes the first real decode, so a hard code costs the
-  *fastest* tier's time rather than the sum of the tiers ahead of it. Opt-in,
-  because it spends a ~250 ms WeChat decode on every frame instead of only the
-  missed ones. `onRace` reports both lanes' times per frame — which is how you
-  find out which tier actually wins on a given device.
+  mid-decode is dropped, never queued, so the scanner never works on stale video.
+- **Or race the two workers.** `race: true` sends each frame to both at once and
+  takes the first real decode, so a hard code costs the *fastest* tier's time
+  rather than the sum of the tiers ahead of it. Opt-in: it spends a ~250 ms
+  WeChat decode on every frame, and needs both workers — without the WeChat
+  worker registered the scanner silently keeps the cascade. `onRace` reports each
+  lane's time per frame, which is how you learn which tier wins on a given device.
 
 For the transport split, worker protocol, and `Engine` contract, see
 [`DESIGN.md`](DESIGN.md).
@@ -147,18 +138,13 @@ Full API: [`packages/core/README.md`](packages/core/README.md).
 makes the two-tier design tractable; if you need general barcodes, use a
 ZXing-based library.
 
-**Codes per frame** depends on which tier won, because tiers are never unioned:
-
-| Tier | Default | With `maxCodesPerFrame` set |
-|------|---------|------------------------------|
-| `native` | **every** code, one pass | unchanged — already free |
-| `jsqr` | one | overlapping tiles — fixed cost, ~2.1s for ten codes |
-| `wechat` | one | mask-and-rescan — one pass per code, ~2.6s for ten |
-
-Multi-code is free on `native` and costs extra passes everywhere else, so it is
-opt-in and defaults to off. It is a still-image feature: at those costs, live
-video would drop to a couple of frames a second. Treat `onResults` as
-"everything the winning engine saw", not a completeness guarantee.
+**Codes per frame depends on which tier won**, because tiers are never unioned.
+`native` returns every code in the frame in one free pass. `jsqr` and `wechat`
+return one unless you raise `maxCodesPerFrame`, which buys the extra codes with
+extra decode passes (~2.1s for ten codes on `jsqr`, ~2.6s on `wechat`) — so it is
+a still-image feature and defaults to off. Treat `onResults` as "everything the
+winning engine saw", not a completeness guarantee. Details:
+[`packages/core/README.md`](packages/core/README.md#many-codes-per-frame).
 
 ## Packages
 
@@ -198,16 +184,12 @@ _Benchmark: 5 images per category, Node runner (Darwin 25.5.0/x64, node v24.17.0
 | jsqr | 0 | 10.7 | 78% |
 | native | n/a | n/a | n/a — no platform BarcodeDetector in Node — native needs a real browser |
 
-> Native `BarcodeDetector` is reported `n/a` here because there is no platform backend off-browser; it is not a loss. The honest comparison the cascade lives in is the WASM/JS one above. The WeChat tier's value is its per-category win on hard codes (blur / low-light / downscale / torture) weighed against its cold-start cost.
+> Native `BarcodeDetector` is reported `n/a` here because there is no platform backend off-browser; it is not a loss. The honest comparison the cascade lives in is the WASM/JS one above. The WeChat tier's value is its per-category win on the hard columns (downscale / damaged / torture) weighed against its cold-start cost — the fast path already saturates clean, rotated, blur, low-light and inverted.
 
 <!--/BENCH-->
 
-Read the per-category row, not the aggregate. The zero-WASM fast path already
-saturates the ordinary categories — clean, rotated, blurred, low-light, inverted.
-What the 2.5 MB actually buys is the hard columns (`downscale_32`, `damaged`,
-`torture`), weighed against the cold-start figure sitting right beside them. That
-pairing is the honest answer to "is the WeChat tier worth it, and for which
-codes".
+Read the per-category row, not the aggregate — the cold-start column beside it is
+what the hard columns cost.
 
 ### In a real browser
 
@@ -232,7 +214,7 @@ _Browser benchmark: chromium 151.0.7922.34, Darwin 25.5.0/x64, generated 2026-07
 
 > A task over 50ms is what the browser itself calls blocking; over ~100ms a tap feels unresponsive. `frames dropped` is what a 60fps camera preview loses.
 
-**Per-frame cost at 720p** — a clean code in a 1280x720 frame read by the fast path, no escalation. The gap between the two rows is what the worker transport costs: one bitmap transfer plus a round trip. Absolute wall-clock is inflated by headless software rasterisation, so read the difference, not the magnitude.
+**Per-frame cost at 720p** — a clean code in a 1280x720 frame read by the fast path, no escalation. The gap between the two rows is what the worker transport costs: one bitmap transfer plus a round trip. Absolute wall-clock is inflated by headless software rasterisation, so read the difference, not the magnitude. Both rows report a 0.0 ms longest task because a fast-path decode is split across awaits, which `longtask` cannot see — blocking is the escalated-decode table above, not this one.
 
 | Transport | per frame | longest task | frames dropped |
 |---|---|---|---|
@@ -263,8 +245,8 @@ pnpm demo        # Vite dev server: webcam + still image
 pnpm benchmark   # regenerate fixtures, run, rewrite the table above
 ```
 
-There is no linter or formatter — `pnpm typecheck` and `pnpm test` are the gates,
-and CI runs both.
+`pnpm typecheck` and `pnpm test` are the gates and CI runs both; there is no
+linter or formatter. See [`CLAUDE.md`](CLAUDE.md) for the fuller command list.
 
 ## License
 

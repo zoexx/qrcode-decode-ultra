@@ -57,7 +57,7 @@ function renderMarkdown(r: BrowserReport): string {
   );
 
   L.push(
-    "**Per-frame cost at 720p** — a clean code in a 1280x720 frame read by the fast path, no escalation. The gap between the two rows is what the worker transport costs: one bitmap transfer plus a round trip. Absolute wall-clock is inflated by headless software rasterisation, so read the difference, not the magnitude.",
+    "**Per-frame cost at 720p** — a clean code in a 1280x720 frame read by the fast path, no escalation. The gap between the two rows is what the worker transport costs: one bitmap transfer plus a round trip. Absolute wall-clock is inflated by headless software rasterisation, so read the difference, not the magnitude. Both rows report a 0.0 ms longest task because a fast-path decode is split across awaits, which `longtask` cannot see — blocking is the escalated-decode table above, not this one.",
     "",
     "| Transport | per frame | longest task | frames dropped |",
     "|---|---|---|---|",
