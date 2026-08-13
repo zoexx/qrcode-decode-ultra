@@ -157,11 +157,44 @@ export interface RaceReport {
   complete: boolean;
 }
 
+/**
+ * Why an engine is not usable here. Machine-readable, because the causes are
+ * not interchangeable and collapsing them destroys the diagnostic:
+ * `no-api` is a permanent property of the browser (WebKit has never shipped
+ * `BarcodeDetector`, so `native` can never run on iOS), while `probe-failed`
+ * means the API is present, claims to support QR, and decoded a known-good
+ * frame wrongly — a broken platform, and the whole reason the probe exists.
+ *
+ * Treat this as an open set: match the cases you care about and fall back to
+ * `reason` for display.
+ */
+export type UnavailableCode =
+  /** No engine is registered for this id — the optional package isn't installed,
+   * or `enableWechat()` was never called. */
+  | "not-installed"
+  /** The platform API this engine wraps does not exist in this browser. Not a
+   * failure; nothing was probed. */
+  | "no-api"
+  /** The API exists but is a polyfill shadowing the platform's, so the native
+   * performance guarantee does not hold. */
+  | "not-native"
+  /** Present, but cannot handle the format the probe validates with. */
+  | "format-unsupported"
+  /** Present and claiming support, but it decoded the synthetic probe frame
+   * incorrectly. The platform is lying about its capability. */
+  | "probe-failed"
+  /** The tier ships its own worker and it could not be started. */
+  | "worker-failed"
+  /** `isAvailable()` threw. See `reason`. */
+  | "error";
+
 export interface EngineStatus {
   engine: EngineId;
   /** Usable in this environment right now (native passed its probe, WASM can load). */
   available: boolean;
-  /** Present when not available, for diagnostics. */
+  /** Machine-readable cause when `available` is false. Absent when available. */
+  code?: UnavailableCode;
+  /** Human-readable explanation when not available, for display and logs. */
   reason?: string;
 }
 

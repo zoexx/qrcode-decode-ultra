@@ -10,7 +10,14 @@ export { registerEngine, registerEngineWorker } from "./engines/registry.js";
 export type { EngineWorkerFactory } from "./engines/registry.js";
 
 export type { BarcodeFormat } from "./formats.js";
-export type { Engine, EngineResult, EngineCapabilities, MultiStrategy } from "./engine.js";
+export type {
+  Availability,
+  Engine,
+  EngineResult,
+  EngineCapabilities,
+  MultiStrategy,
+  Unavailable,
+} from "./engine.js";
 export type {
   EngineId,
   EnginePreset,
@@ -24,6 +31,7 @@ export type {
   RaceLeg,
   RaceReport,
   EngineStatus,
+  UnavailableCode,
   Diagnostic,
   DiagnosticKind,
   ScanError,

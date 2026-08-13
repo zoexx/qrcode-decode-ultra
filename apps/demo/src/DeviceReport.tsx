@@ -254,10 +254,24 @@ export function DeviceReport() {
                   <span className="engine-state" data-ok={e.available}>
                     {e.available ? "available" : "unavailable"}
                   </span>
+                  {e.code && <code className="engine-code">{e.code}</code>}
                   {e.reason && <span className="engine-reason">{e.reason}</span>}
                 </li>
               ))}
             </ul>
+            {report.engines.some((e) => e.code === "no-api") && (
+              <p className="note">
+                <code>no-api</code> is a property of the browser, not a fault on this device — that
+                tier can never run here, and the cascade is designed to carry on without it.
+              </p>
+            )}
+            {report.engines.some((e) => e.code === "probe-failed") && (
+              <p className="warn">
+                <code>probe-failed</code> means the platform claims to support QR and decoded a
+                known-good frame incorrectly. That is a browser bug worth reporting — please open an
+                issue with this report attached.
+              </p>
+            )}
             <p className="note">
               Platform <code>BarcodeDetector</code> reports:{" "}
               {report.nativeFormats

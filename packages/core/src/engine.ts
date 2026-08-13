@@ -1,7 +1,7 @@
 import type { BarcodeFormat } from "./formats.js";
 import { intersectFormats } from "./formats.js";
 import { decodeUpTo, type MultiStrategy } from "./multi.js";
-import type { Diagnostic, EngineId, FrameImage, Point } from "./types.js";
+import type { Diagnostic, EngineId, FrameImage, Point, UnavailableCode } from "./types.js";
 
 export interface EngineResult {
   value: string;
@@ -16,6 +16,57 @@ export interface EngineCapabilities {
   multi: MultiStrategy;
 }
 
+/** An engine that cannot run here, and why. */
+export interface Unavailable {
+  available: false;
+  code: UnavailableCode;
+  /** Overrides the default text for `code`. Use for anything code alone can't say. */
+  detail?: string;
+}
+
+/**
+ * What `isAvailable()` resolves to.
+ *
+ * A bare boolean is still valid, so an engine with nothing to explain — `jsqr`
+ * is always available — just returns `true`. Returning `Unavailable` instead of
+ * `false` is how an engine says *why*, which is the difference between "this
+ * browser never had the API" and "the API is here and broken".
+ */
+export type Availability = boolean | Unavailable;
+
+/** Collapse either form to a single shape. */
+export function normalizeAvailability(a: Availability): { available: boolean; code?: UnavailableCode; detail?: string } {
+  if (typeof a === "boolean") {
+    // A bare `false` cannot say more than this.
+    return a ? { available: true } : { available: false, code: "probe-failed" };
+  }
+  return { available: false, code: a.code, detail: a.detail };
+}
+
+/** Default human-readable text per cause. `detail` overrides it when present. */
+const REASON: Record<UnavailableCode, string> = {
+  "not-installed": "not installed — no engine is registered for this id",
+  "no-api": "not implemented in this browser",
+  "not-native": "shadowed by a non-native polyfill",
+  "format-unsupported": "present, but does not support the probed format",
+  "probe-failed": "present, but decoded the probe frame incorrectly",
+  "worker-failed": "its worker could not be started",
+  error: "availability check threw",
+};
+
+export function reasonText(code: UnavailableCode, detail?: string): string {
+  return detail ?? REASON[code];
+}
+
+/**
+ * Can this engine actually run? Always use this instead of
+ * `if (await engine.isAvailable())` — an `Unavailable` object is itself truthy,
+ * so the bare check silently passes exactly the engines it should reject.
+ */
+export async function engineUsable(engine: Engine): Promise<boolean> {
+  return normalizeAvailability(await engine.isAvailable()).available;
+}
+
 /**
  * One decode engine. The worker path and the in-process fallback both drive
  * engines through this single interface, which is why native is "just another
@@ -26,10 +77,12 @@ export interface Engine {
   readonly capabilities: EngineCapabilities;
   /**
    * Cheap availability gate. Native runs its live synthetic-decode probe here;
-   * WASM engines report whether they can instantiate. Returning false removes
-   * the engine from the cascade without throwing.
+   * WASM engines report whether they can instantiate. Anything other than
+   * `true` removes the engine from the cascade without throwing — return an
+   * `Unavailable` rather than a bare `false` so the reason survives to
+   * `EngineStatus`.
    */
-  isAvailable(): Promise<boolean>;
+  isAvailable(): Promise<Availability>;
   /** Lazy + idempotent. Concurrent calls share one in-flight load. */
   load(): Promise<void>;
   ready(): boolean;
@@ -71,8 +124,13 @@ export async function runCascade(
     }
 
     try {
-      if (!(await engine.isAvailable())) {
-        onDiagnostic?.({ engine: engine.id, kind: "unavailable" });
+      const availability = normalizeAvailability(await engine.isAvailable());
+      if (!availability.available) {
+        onDiagnostic?.({
+          engine: engine.id,
+          kind: "unavailable",
+          detail: availability.code ? reasonText(availability.code, availability.detail) : undefined,
+        });
         continue;
       }
       if (!engine.ready()) {

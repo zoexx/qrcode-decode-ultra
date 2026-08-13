@@ -1,11 +1,13 @@
 import { runScan } from "./decode.js";
 import type { Engine } from "./engine.js";
+import { engineUsable, normalizeAvailability } from "./engine.js";
 import {
   buildStatuses,
   createEngines,
   getEngineWorkerFactory,
   hasEngine,
   resolveEngineIds,
+  unavailable,
 } from "./engines/registry.js";
 import type { BarcodeFormat } from "./formats.js";
 import { toBitmap, toFrameImage, workerTransportAvailable } from "./normalize.js";
@@ -140,7 +142,7 @@ class QRScanner implements Scanner {
           formats: this.formats,
           maxCodesPerFrame: this.maxCodesPerFrame,
         });
-        const status = statuses[0] ?? { engine: "wechat" as const, available: false, reason: "not installed" };
+        const status = statuses[0] ?? unavailable("wechat", "not-installed");
         if (status.available) return status;
         // Came up but cannot decode here — drop it rather than pay a round trip
         // per frame for a guaranteed miss.
@@ -155,25 +157,30 @@ class QRScanner implements Scanner {
         if (hasEngine("wechat")) {
           this.wechat = createEngines(["wechat"])[0] ?? null;
           const status = await this.probeInProcessWechat();
+          // Still available, but degraded — the caller needs to know the decode
+          // is now on the main thread, so the reason rides along on a healthy
+          // status. No `code`: the tier works.
           return status.available ? { ...status, reason } : status;
         }
-        return { engine: "wechat", available: false, reason };
+        return unavailable("wechat", "worker-failed", reason);
       }
     }
     if (hasEngine("wechat")) {
       this.wechat = createEngines(["wechat"])[0] ?? null;
       return this.probeInProcessWechat();
     }
-    return { engine: "wechat", available: false, reason: "not installed" };
+    return unavailable("wechat", "not-installed");
   }
 
   private async probeInProcessWechat(): Promise<EngineStatus> {
-    if (!this.wechat) return { engine: "wechat", available: false, reason: "not installed" };
+    if (!this.wechat) return unavailable("wechat", "not-installed");
     try {
-      const available = await this.wechat.isAvailable();
-      return available ? { engine: "wechat", available } : { engine: "wechat", available, reason: "probe failed" };
+      const { available, code, detail } = normalizeAvailability(await this.wechat.isAvailable());
+      return available
+        ? { engine: "wechat", available }
+        : unavailable("wechat", code ?? "probe-failed", detail);
     } catch (err) {
-      return { engine: "wechat", available: false, reason: err instanceof Error ? err.message : String(err) };
+      return unavailable("wechat", "error", err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -198,12 +205,12 @@ class QRScanner implements Scanner {
     await this.ensureInit();
     if (this.client) {
       await Promise.all([this.client.preload(), this.wechatClient?.preload()]);
-      if (this.wechat && (await this.wechat.isAvailable())) await this.wechat.load();
+      if (this.wechat && (await engineUsable(this.wechat))) await this.wechat.load();
       return;
     }
     await Promise.all(
       (this.engines ?? []).map(async (e) => {
-        if (await e.isAvailable()) await e.load();
+        if (await engineUsable(e)) await e.load();
       }),
     );
   }
@@ -418,7 +425,7 @@ class QRScanner implements Scanner {
       try {
         if (this.wechatClient) {
           await this.wechatClient.preload();
-        } else if (this.wechat && (await this.wechat.isAvailable())) {
+        } else if (this.wechat && (await engineUsable(this.wechat))) {
           await this.wechat.load();
         }
       } catch {

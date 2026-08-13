@@ -1,4 +1,4 @@
-import type { Engine, EngineResult } from "../engine.js";
+import type { Availability, Engine, EngineResult } from "../engine.js";
 import type { BarcodeFormat } from "../formats.js";
 import { ALL_FORMATS, isBarcodeFormat } from "../formats.js";
 import type { FrameImage, Point } from "../types.js";
@@ -47,29 +47,47 @@ export class NativeEngine implements Engine {
   // `detect()` already returns every code in the frame, in one pass.
   readonly capabilities = { formats: new Set<BarcodeFormat>(ALL_FORMATS), multi: "inherent" as const };
 
-  private probe: Promise<boolean> | null = null;
+  private probe: Promise<Availability> | null = null;
   private supported: Set<BarcodeFormat> = new Set();
   private detector: NativeDetector | null = null;
 
-  isAvailable(): Promise<boolean> {
+  isAvailable(): Promise<Availability> {
     if (!this.probe) this.probe = this.runProbe();
     return this.probe;
   }
 
-  private async runProbe(): Promise<boolean> {
+  /**
+   * Each exit reports its own cause. They are genuinely different situations:
+   * `no-api` is permanent and universal for the browser (iOS Safari, Firefox),
+   * while `probe-failed` is a platform that claims QR support and gets a
+   * known-good frame wrong — rare, machine-specific, and worth reporting
+   * upstream. One shared "probe failed" string made those indistinguishable.
+   */
+  private async runProbe(): Promise<Availability> {
     const ctor = getCtor();
-    if (!ctor || !looksNative(ctor)) return false;
+    if (!ctor) return { available: false, code: "no-api" };
+    if (!looksNative(ctor)) return { available: false, code: "not-native" };
 
     let supportedNames: string[];
     try {
       supportedNames = await ctor.getSupportedFormats();
-    } catch {
-      return false;
+    } catch (err) {
+      return {
+        available: false,
+        code: "error",
+        detail: `getSupportedFormats() threw: ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
     this.supported = new Set(supportedNames.filter(isBarcodeFormat) as BarcodeFormat[]);
     if (!this.supported.has("qr_code")) {
       // We probe with a QR; if the platform can't do QR we can't validate it.
-      return false;
+      return {
+        available: false,
+        code: "format-unsupported",
+        detail: supportedNames.length
+          ? `no qr_code support — reports ${supportedNames.join(", ")}`
+          : "reports no supported formats",
+      };
     }
 
     try {
@@ -77,9 +95,20 @@ export class NativeEngine implements Engine {
       const found = await detector.detect(toImageData(getProbeFrame()));
       // The crux: constructor + getSupportedFormats can both succeed while
       // detect() silently returns []. Only a correct decode promotes native.
-      return found.some((b) => b.rawValue === PROBE_PAYLOAD);
-    } catch {
-      return false;
+      if (found.some((b) => b.rawValue === PROBE_PAYLOAD)) return true;
+      return {
+        available: false,
+        code: "probe-failed",
+        detail: found.length
+          ? `probe frame decoded as ${JSON.stringify(found[0]?.rawValue ?? "")}, expected ${JSON.stringify(PROBE_PAYLOAD)}`
+          : "probe frame returned no codes despite reporting qr_code support",
+      };
+    } catch (err) {
+      return {
+        available: false,
+        code: "error",
+        detail: `detect() threw: ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
   }
 

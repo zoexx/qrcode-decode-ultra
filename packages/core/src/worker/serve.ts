@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import type { Engine } from "../engine.js";
+import { engineUsable } from "../engine.js";
 import { buildStatuses, createEngines } from "../engines/registry.js";
 import { runScan } from "../decode.js";
 import type { BarcodeFormat } from "../formats.js";
@@ -62,7 +63,7 @@ export function serveWorker(): void {
         try {
           await Promise.all(
             engines.map(async (e) => {
-              if (await e.isAvailable()) await e.load();
+              if (await engineUsable(e)) await e.load();
             }),
           );
           post({ type: "preloaded", id: msg.id });

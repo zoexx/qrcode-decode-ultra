@@ -35,6 +35,24 @@ synthetic QR (`probe-image.ts`) and checks `BarcodeDetector.toString()` for
 `[native code]`. If either check fails, native drops out and `jsqr` becomes the
 de-facto first tier. On Windows / Linux / iOS / Firefox native is simply absent.
 
+**Each way of failing reports itself.** "Unavailable" is not one condition, and
+flattening them destroys the diagnostic — `no-api` is a permanent property of
+the browser (WebKit has never shipped Shape Detection, so `native` can never run
+on any iOS browser), whereas `probe-failed` means the API is present, claims
+`qr_code`, and got a known-good frame wrong: a broken platform worth reporting
+upstream. `EngineStatus.code` carries the machine-readable cause and
+`EngineStatus.reason` the display text:
+
+| `code` | Means | Seen on |
+|---|---|---|
+| `no-api` | the platform API does not exist here | iOS (all browsers), Firefox, desktop Linux |
+| `not-native` | a polyfill is shadowing the platform API | a stray `barcode-detector` dependency |
+| `format-unsupported` | present, but cannot do the probed format | partial Chromium backends |
+| `probe-failed` | claims support, decoded the probe frame wrong | pre-113 Chrome on macOS Ventura |
+| `worker-failed` | the tier's own worker would not start | CSP `worker-src`, missing chunk |
+| `not-installed` | no engine registered for the id | `enableWechat()` never called |
+| `error` | the availability check threw | — |
+
 Where native *is* real it is the cheapest tier and stronger than the `jsqr` tier
 behind it — though not stronger than `wechat`, which still wins the `downscale_32`
 and `torture` categories in `pnpm benchmark:browser`. It earns that because it is
@@ -62,13 +80,22 @@ cascade code and native is "just another engine".
 interface Engine {
   readonly id: EngineId;
   readonly capabilities: { formats: ReadonlySet<BarcodeFormat> };
-  isAvailable(): Promise<boolean>;   // native runs its live probe here
+  isAvailable(): Promise<Availability>;  // native runs its live probe here
   load(): Promise<void>;             // lazy, idempotent — no double WASM download
   ready(): boolean;
   decode(frame: FrameImage, formats: BarcodeFormat[]): Promise<EngineResult[]>;
   dispose(): void;
 }
+
+// `true` when usable; an object when not, so the cause survives to EngineStatus.
+type Availability = boolean | { available: false; code: UnavailableCode; detail?: string };
 ```
+
+`Availability` is a union so a bare `true` stays valid — `jsqr` has nothing to
+explain. The cost of that convenience is that an `Unavailable` object is
+**truthy**, so `if (await engine.isAvailable())` silently admits every engine it
+should reject. Never write that: call `engineUsable(engine)`, or normalize with
+`normalizeAvailability()`.
 
 Two rules carry the whole design:
 

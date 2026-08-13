@@ -15,6 +15,13 @@
  */
 export { serveWorker } from "./serve.js";
 export { registerEngine } from "../engines/registry.js";
-export type { Engine, EngineResult, EngineCapabilities, MultiStrategy } from "../engine.js";
+export type {
+  Availability,
+  Engine,
+  EngineResult,
+  EngineCapabilities,
+  MultiStrategy,
+  Unavailable,
+} from "../engine.js";
 export type { BarcodeFormat } from "../formats.js";
-export type { EngineId, FrameImage, Point } from "../types.js";
+export type { EngineId, FrameImage, Point, UnavailableCode } from "../types.js";

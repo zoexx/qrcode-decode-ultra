@@ -1,11 +1,13 @@
 import {
   registerEngine,
   registerEngineWorker,
+  type Availability,
   type BarcodeFormat,
   type Engine,
   type EngineResult,
   type FrameImage,
 } from "qrcode-decode-ultra";
+import { wasmAvailability } from "./availability.js";
 
 /**
  * A stand-in for the real engine that defers `import("./engine.js")` — and with
@@ -24,8 +26,8 @@ class LazyWechatEngine implements Engine {
   private inner: Engine | null = null;
   private loading: Promise<void> | null = null;
 
-  isAvailable(): Promise<boolean> {
-    return Promise.resolve(typeof WebAssembly !== "undefined");
+  isAvailable(): Promise<Availability> {
+    return Promise.resolve(wasmAvailability());
   }
 
   load(): Promise<void> {

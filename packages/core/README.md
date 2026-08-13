@@ -150,8 +150,10 @@ moved past.
 ```ts
 interface Scanner {
   // Which engines are usable here, in requested order. Runs the native probe;
-  // downloads nothing. Unusable tiers carry a `reason` ("not installed",
-  // "probe failed", or the thrown message).
+  // downloads nothing. An unusable tier carries a machine-readable `code` and a
+  // human-readable `reason` — "no-api" (the browser never had it: `native` on
+  // any iOS browser, Firefox, desktop Linux) is a very different answer from
+  // "probe-failed" (present, claims QR, decoded a known-good frame wrong).
   ready(): Promise<EngineStatus[]>;
 
   // Eagerly load the engines the cascade will use, so the first scan isn't cold.

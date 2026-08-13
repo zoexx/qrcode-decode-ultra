@@ -1,5 +1,6 @@
 import type { Engine } from "../engine.js";
-import type { EngineId, EnginePreset, EngineStatus } from "../types.js";
+import { normalizeAvailability, reasonText } from "../engine.js";
+import type { EngineId, EnginePreset, EngineStatus, UnavailableCode } from "../types.js";
 
 export type EngineFactory = () => Engine;
 
@@ -83,15 +84,21 @@ export async function buildStatuses(
   for (const id of requestedIds) {
     const engine = byId.get(id);
     if (!engine) {
-      statuses.push({ engine: id, available: false, reason: "not installed" });
+      statuses.push(unavailable(id, "not-installed"));
       continue;
     }
     try {
-      const available = await engine.isAvailable();
-      statuses.push(available ? { engine: id, available } : { engine: id, available, reason: "probe failed" });
+      const { available, code, detail } = normalizeAvailability(await engine.isAvailable());
+      statuses.push(available ? { engine: id, available } : unavailable(id, code ?? "probe-failed", detail));
     } catch (err) {
-      statuses.push({ engine: id, available: false, reason: err instanceof Error ? err.message : String(err) });
+      statuses.push(unavailable(id, "error", err instanceof Error ? err.message : String(err)));
     }
   }
   return statuses;
+}
+
+/** The one place an unavailable `EngineStatus` is built, so `code` and `reason`
+ * can never disagree. */
+export function unavailable(engine: EngineId, code: UnavailableCode, detail?: string): EngineStatus {
+  return { engine, available: false, code, reason: reasonText(code, detail) };
 }

@@ -1,4 +1,5 @@
 import {
+  type Availability,
   type BarcodeFormat,
   type Engine,
   type EngineResult,
@@ -6,6 +7,7 @@ import {
   type Point,
 } from "qrcode-decode-ultra/worker-runtime";
 import { ready, scan } from "qr-scanner-wechat";
+import { wasmAvailability } from "./availability.js";
 
 /**
  * OpenCV WeChat QRCode engine — high accuracy on small / blurry / damaged /
@@ -34,8 +36,8 @@ export class WechatEngine implements Engine {
   private loadPromise: Promise<void> | null = null;
   private loaded = false;
 
-  isAvailable(): Promise<boolean> {
-    return Promise.resolve(typeof WebAssembly !== "undefined");
+  isAvailable(): Promise<Availability> {
+    return Promise.resolve(wasmAvailability());
   }
 
   load(): Promise<void> {

@@ -107,4 +107,43 @@ describe("runCascade", () => {
     expect(outcome.engine).toBeNull();
     expect(outcome.results).toHaveLength(0);
   });
+
+  /**
+   * `isAvailable()` may resolve to an `Unavailable` object instead of `false`,
+   * and that object is truthy — so a bare `if (await engine.isAvailable())`
+   * would run precisely the engines it must skip. Everything goes through
+   * `normalizeAvailability`; this pins that down.
+   */
+  it("skips an engine that reports Unavailable, and reports the reason", async () => {
+    const native = fakeEngine("native", ["qr_code"], () =>
+      Promise.resolve([{ value: "SHOULD-NOT-RUN", format: "qr_code" as const }]),
+    );
+    native.isAvailable = () => Promise.resolve({ available: false as const, code: "no-api" as const });
+    const decode = vi.fn(() => Promise.resolve([{ value: "Q", format: "qr_code" as const }]));
+    const diags: { engine: string; detail?: string }[] = [];
+
+    const outcome = await runCascade(
+      [native, fakeEngine("jsqr", ["qr_code"], decode)],
+      FRAME,
+      ["qr_code"],
+      (d) => diags.push({ engine: d.engine, detail: d.detail }),
+    );
+
+    expect(outcome.engine).toBe("jsqr");
+    expect(outcome.results[0]?.value).toBe("Q");
+    expect(diags).toContainEqual({ engine: "native", detail: "not implemented in this browser" });
+  });
+
+  it("still accepts a bare boolean false", async () => {
+    const native = fakeEngine("native", ["qr_code"], () =>
+      Promise.resolve([{ value: "SHOULD-NOT-RUN", format: "qr_code" as const }]),
+    );
+    native.isAvailable = () => Promise.resolve(false);
+    const outcome = await runCascade(
+      [native, fakeEngine("jsqr", ["qr_code"], () => Promise.resolve([{ value: "Q", format: "qr_code" as const }]))],
+      FRAME,
+      ["qr_code"],
+    );
+    expect(outcome.engine).toBe("jsqr");
+  });
 });

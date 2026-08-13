@@ -432,9 +432,11 @@ export function toMarkdown(r: DeviceReport): string {
   L.push("");
 
   L.push(`**Engines**`, "");
-  L.push(`| Engine | Available | Reason |`, `|---|---|---|`);
+  L.push(`| Engine | Available | Cause | Reason |`, `|---|---|---|---|`);
   for (const e of r.engines) {
-    L.push(`| \`${e.engine}\` | ${e.available ? "yes" : "no"} | ${e.reason ?? ""} |`);
+    L.push(
+      `| \`${e.engine}\` | ${e.available ? "yes" : "no"} | ${e.code ? `\`${e.code}\`` : ""} | ${e.reason ?? ""} |`,
+    );
   }
   L.push("");
   L.push(
