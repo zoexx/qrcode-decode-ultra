@@ -172,6 +172,22 @@ h1 {
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
+/* The links between the demo and the device report reuse .tab's type, but sit
+   outside a .tabs group, so they need their own frame to read as a control. */
+a.tab {
+  display: inline-block;
+  text-decoration: none;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 7px 14px;
+  white-space: nowrap;
+}
+
+a.tab:hover {
+  border-color: var(--native);
+  color: var(--text);
+}
+
 .select {
   appearance: none;
   background: var(--panel);

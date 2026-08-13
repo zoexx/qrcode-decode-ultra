@@ -1,0 +1,56 @@
+# Publishes apps/demo to GitHub Pages: the live camera demo at / and the
+# on-device benchmark report at /report.html.
+#
+# The point is real devices. getUserMedia needs a secure context, so a phone
+# cannot use `vite --host` over a LAN IP — Pages gives the demo an HTTPS origin
+# anyone can open, and gives the project a demo URL for the README.
+#
+# Not a merge gate. ci.yml still owns typecheck + test; this only publishes, and
+# only from main.
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it — a half-published site
+# is worse than a slightly stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The demo imports the workspace packages by their published entry points,
+      # so they have to be built first.
+      - run: pnpm build
+      - run: pnpm -C apps/demo build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/demo/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

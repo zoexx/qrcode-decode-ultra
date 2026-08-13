@@ -12,6 +12,7 @@ pnpm build        # build all packages/* via tsup
 pnpm test         # vitest run across all packages
 pnpm typecheck    # tsc --noEmit across the whole workspace
 pnpm demo         # Vite dev server for apps/demo (webcam + still image)
+                  # /report.html is the on-device benchmark report
 pnpm benchmark    # regenerate fixtures, run the bench, rewrite the README table
 ```
 
@@ -57,8 +58,17 @@ Where things live:
   factory; the main-thread engine is lazily imported so the ~6MB payload is only
   fetched on the path that actually uses it. **Never put a WeChat decode on the
   main thread** — it measures ~250-325ms, a visible freeze on live video.
-- `apps/demo` — private Vite app; the only end-to-end exercise of the lazy
-  `enableWechat()` path.
+- `apps/demo` — private Vite app, two pages, and the only end-to-end exercise of
+  the lazy `enableWechat()` path. `index.html` is the camera + still-image demo;
+  `report.html` (`src/probe.ts` + `src/DeviceReport.tsx`) is the **device
+  report** — it replays `benchmark/fixtures` in whatever browser is open and
+  emits the results as pasteable markdown. That is the only way this repo gets
+  numbers off a real phone: the Node runner reports `native` as `n/a`, and
+  `bench.yml` says of headless Linux CI that "the macOS/Android numbers are the
+  real ones" while nothing else produces them. `base` is `"./"` so one build
+  works at a domain root or under a Pages project sub-path — **use
+  `import.meta.env.BASE_URL` for runtime asset URLs, never a leading slash.**
+  Deployed to GitHub Pages by `.github/workflows/pages.yml` on push to main.
 - `benchmark` — private `tsx` harness, in two halves. `harness/runner.ts` is the
   Node runner (detection accuracy, reproduces anywhere); `browser/runner.ts`
   drives headless Chromium via Playwright for the two things Node cannot see —

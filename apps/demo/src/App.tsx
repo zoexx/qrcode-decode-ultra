@@ -413,8 +413,10 @@ function ImageView({ preset, multi, race, panel }: ViewProps) {
   };
 
   const onSample = async (name: string) => {
-    // Same path as a picked file — scanImage takes any Blob.
-    const res = await fetch(name);
+    // Same path as a picked file — scanImage takes any Blob. BASE_URL, not a
+    // leading slash: the build is deployed under a project sub-path on GitHub
+    // Pages, where "/qr-clean.png" would resolve to the domain root.
+    const res = await fetch(import.meta.env.BASE_URL + name);
     void scan(await res.blob());
   };
 
@@ -428,11 +430,11 @@ function ImageView({ preset, multi, race, panel }: ViewProps) {
           </label>
           <span className="samples">
             or try{" "}
-            <button type="button" onClick={() => void onSample("/qr-clean.png")}>
+            <button type="button" onClick={() => void onSample("qr-clean.png")}>
               a clean QR
             </button>{" "}
             ·{" "}
-            <button type="button" onClick={() => void onSample("/qr-hard.png")}>
+            <button type="button" onClick={() => void onSample("qr-hard.png")}>
               a low-res one
             </button>
           </span>
@@ -586,6 +588,9 @@ export function App() {
             <option value="fast">fast — native + jsQR, no WASM</option>
             <option value="max-accuracy">max-accuracy — + WeChat</option>
           </select>
+          <a className="tab" href="./report.html">
+            Device report
+          </a>
           <ScreenRecorder />
         </div>
       </header>
