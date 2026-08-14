@@ -12,11 +12,30 @@
  */
 import { createScanner, type EngineId, type EngineStatus, type Scanner } from "qrcode-decode-ultra";
 
+export type { EngineStatus };
+
 /** A row of `benchmark/fixtures/manifest.json`. */
 interface ManifestRow {
   image: string;
   expected: string;
   category: string;
+}
+
+/**
+ * A closed set rather than `Record<string, boolean>`: the compatibility axes
+ * read individual keys, and under `noUncheckedIndexedAccess` a Record lookup is
+ * `boolean | undefined` — which would quietly let a typo read as "unsupported".
+ */
+export interface Features {
+  WebAssembly: boolean;
+  Worker: boolean;
+  OffscreenCanvas: boolean;
+  createImageBitmap: boolean;
+  BarcodeDetector: boolean;
+  getUserMedia: boolean;
+  /** Not required by this library — nothing here uses SharedArrayBuffer — but it
+   * is the usual reason a WASM tier behaves differently across hosts. */
+  crossOriginIsolated: boolean;
 }
 
 export interface Environment {
@@ -29,7 +48,7 @@ export interface Environment {
   /** `navigator.deviceMemory`, in GB. Chromium-only; null on Safari. */
   memoryGb: number | null;
   secureContext: boolean;
-  features: Record<string, boolean>;
+  features: Features;
 }
 
 export interface BlockingSample {
@@ -81,6 +100,61 @@ export interface CameraReport {
   focusModes: string[];
 }
 
+/**
+ * The five things that independently decide how well this library works here.
+ * Kept separate from the grade so a report says *which* axis is down, not just
+ * how bad the total is.
+ */
+export interface CompatAxes {
+  /** Some engine can decode. `jsqr` is pure JS, so this is the universal floor. */
+  decode: boolean;
+  /** The free platform tier. The only axis that varies by engine *and* platform. */
+  nativeTier: boolean;
+  /** The WeChat tier — needs WebAssembly and the optional package. */
+  strongTier: boolean;
+  /** Decoding stays off the main thread. Mirrors core's `workerTransportAvailable()`. */
+  offMainThread: boolean;
+  /** Live camera scanning is possible at all. Orthogonal to decoding stills. */
+  camera: boolean;
+}
+
+/**
+ * One verdict, worst-axis-first, so a reader who does not know the cascade still
+ * gets an answer. `camera` is deliberately not in this ladder — a page that only
+ * decodes uploaded images is not degraded, it is a different use case — so it is
+ * reported alongside instead.
+ */
+export type CompatGrade = "full" | "strong" | "basic" | "degraded" | "blocked";
+
+export const GRADE_TEXT: Record<CompatGrade, string> = {
+  full: "every tier available, all off the main thread",
+  strong: "no platform detector here, so jsQR leads and WeChat covers the hard codes",
+  basic: "fast path only — no strong tier, so small or damaged codes will be missed",
+  degraded: "decoding runs on the main thread — the UI will freeze during a scan",
+  blocked: "no engine can decode in this environment",
+};
+
+export function gradeOf(axes: CompatAxes): CompatGrade {
+  if (!axes.decode) return "blocked";
+  if (!axes.offMainThread) return "degraded";
+  if (!axes.strongTier) return "basic";
+  return axes.nativeTier ? "full" : "strong";
+}
+
+export function axesOf(env: Environment, engines: EngineStatus[]): CompatAxes {
+  const usable = (id: EngineId) => engines.some((e) => e.engine === id && e.available);
+  return {
+    decode: engines.some((e) => e.available),
+    nativeTier: usable("native"),
+    strongTier: usable("wechat"),
+    // Same three checks as core's workerTransportAvailable(); if any is missing
+    // the scanner silently decodes in-process instead.
+    offMainThread:
+      env.features.Worker && env.features.OffscreenCanvas && env.features.createImageBitmap,
+    camera: env.features.getUserMedia && env.secureContext,
+  };
+}
+
 export interface DeviceReport {
   generatedAt: string;
   env: Environment;
@@ -94,6 +168,18 @@ export interface DeviceReport {
   blocking: Record<string, BlockingSample> | null;
   camera: CameraReport | null;
   cameraError: string | null;
+}
+
+/**
+ * Published on `window` once a run finishes, so the CI compatibility matrix can
+ * read a structured object instead of scraping the rendered page. This keeps
+ * `probe.ts` the single definition of what a device report contains — the
+ * benchmark runner consumes it rather than reimplementing it.
+ */
+declare global {
+  interface Window {
+    qrduReport?: DeviceReport;
+  }
 }
 
 const BASE = import.meta.env.BASE_URL;
@@ -128,9 +214,6 @@ export function environment(): Environment {
       createImageBitmap: has("createImageBitmap"),
       BarcodeDetector: has("BarcodeDetector"),
       getUserMedia: !!navigator.mediaDevices?.getUserMedia,
-      // Not required by this library (nothing here uses SharedArrayBuffer), but
-      // worth recording: it is the usual reason a WASM tier behaves differently
-      // across hosts.
       crossOriginIsolated: !!window.crossOriginIsolated,
     },
   };
@@ -419,6 +502,17 @@ export function toMarkdown(r: DeviceReport): string {
   const L: string[] = [];
   L.push(`## qrcode-decode-ultra device report`, "");
   L.push(`_Generated ${r.generatedAt}_`, "");
+
+  const axes = axesOf(r.env, r.engines);
+  const grade = gradeOf(axes);
+  L.push(`**Compatibility: \`${grade}\`** — ${GRADE_TEXT[grade]}`, "");
+  L.push(`| Axis | |`, `|---|---|`);
+  L.push(`| decodes at all | ${axes.decode ? "yes" : "**no**"} |`);
+  L.push(`| platform \`native\` tier | ${axes.nativeTier ? "yes" : "no"} |`);
+  L.push(`| \`wechat\` strong tier | ${axes.strongTier ? "yes" : "no"} |`);
+  L.push(`| off the main thread | ${axes.offMainThread ? "yes" : "**no**"} |`);
+  L.push(`| live camera | ${axes.camera ? "yes" : "**no**"} |`);
+  L.push("");
 
   L.push(`| Device | |`, `|---|---|`);
   L.push(`| user agent | \`${r.env.userAgent}\` |`);

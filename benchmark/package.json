@@ -9,6 +9,8 @@
     "benchmark": "tsx scripts/gen-synthetic.ts && tsx harness/runner.ts",
     "report": "tsx harness/runner.ts",
     "benchmark:browser": "tsx browser/runner.ts",
+    "compat": "tsx compat/runner.ts",
+    "compat:devices": "tsx compat/devices.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

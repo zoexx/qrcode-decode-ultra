@@ -1,13 +1,17 @@
 import { useCallback, useRef, useState } from "react";
 import { createScanner, type EngineId } from "qrcode-decode-ultra";
 import {
+  axesOf,
   environment,
+  gradeOf,
+  GRADE_TEXT,
   loadManifest,
   nativeFormats,
   probeCamera,
   runBlocking,
   runDetection,
   toMarkdown,
+  type CompatAxes,
   type DeviceReport as Report,
 } from "./probe.js";
 import "./styles.css";
@@ -39,6 +43,54 @@ function Rate({ hit, total }: { hit: number; total: number }) {
         {hit}/{total}
       </span>
     </div>
+  );
+}
+
+/**
+ * A short device name for an issue title. Deliberately crude — the full UA is
+ * in the body; this only has to make a list of issues skimmable.
+ */
+function shortDevice(ua: string): string {
+  const browser =
+    /Firefox\/[\d.]+/.exec(ua)?.[0] ??
+    /Edg\/[\d.]+/.exec(ua)?.[0] ??
+    /Chrome\/[\d.]+/.exec(ua)?.[0] ??
+    /Version\/([\d.]+).*Safari/.exec(ua)?.[0].replace(/Version\/([\d.]+).*/, "Safari $1") ??
+    "unknown browser";
+  const platform = /iPhone|iPad|Android|Macintosh|Windows|Linux|CrOS/.exec(ua)?.[0] ?? "unknown";
+  return `${platform} · ${browser}`;
+}
+
+const AXIS_LABEL: Record<keyof CompatAxes, string> = {
+  decode: "decodes at all",
+  nativeTier: "platform native tier",
+  strongTier: "wechat strong tier",
+  offMainThread: "off the main thread",
+  camera: "live camera",
+};
+
+/**
+ * The headline. A grade is only useful next to the axes that produced it —
+ * "strong" means nothing until you can see that it is `native` that is missing.
+ */
+function GradeBanner({ report }: { report: Report }) {
+  const axes = axesOf(report.env, report.engines);
+  const grade = gradeOf(axes);
+  return (
+    <section className="grade" data-grade={grade}>
+      <div className="grade-head">
+        <span className="grade-label">Compatibility</span>
+        <b className="grade-value">{grade}</b>
+      </div>
+      <p className="grade-text">{GRADE_TEXT[grade]}</p>
+      <div className="axes">
+        {(Object.keys(AXIS_LABEL) as (keyof CompatAxes)[]).map((key) => (
+          <span key={key} className="axis" data-ok={axes[key]}>
+            {AXIS_LABEL[key]}
+          </span>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -114,7 +166,7 @@ export function DeviceReport() {
   const cameraErrRef = useRef<string | null>(null);
 
   const build = useCallback((partial: Partial<Report>): Report => {
-    return {
+    const next: Report = {
       generatedAt: new Date().toISOString(),
       env: environment(),
       engines: [],
@@ -126,6 +178,9 @@ export function DeviceReport() {
       cameraError: cameraErrRef.current,
       ...partial,
     };
+    // The CI compatibility matrix reads this instead of scraping the DOM.
+    window.qrduReport = next;
+    return next;
   }, []);
 
   const run = useCallback(async () => {
@@ -183,6 +238,27 @@ export function DeviceReport() {
   }, [build]);
 
   const markdown = report ? toMarkdown(report) : "";
+
+  /**
+   * A prefilled "new issue" link. The title carries the grade and a short device
+   * name so the matrix can be assembled from issue titles alone, and the
+   * `device-report` label is what the aggregation script filters on.
+   *
+   * Long bodies are dropped rather than truncated: GitHub silently cuts an
+   * over-long querystring, and half a report in an issue is worse than a prompt
+   * to paste the whole one.
+   */
+  const issueUrl = (() => {
+    const base = "https://github.com/zoexx/qrcode-decode-ultra/issues/new";
+    if (!report) return base;
+    const axes = axesOf(report.env, report.engines);
+    const title = `device report: ${shortDevice(report.env.userAgent)} — ${gradeOf(axes)}`;
+    const params = new URLSearchParams({ title, labels: "device-report" });
+    const withBody = new URLSearchParams(params);
+    withBody.set("body", markdown);
+    const url = `${base}?${withBody}`;
+    return url.length < 6000 ? url : `${base}?${params}`;
+  })();
 
   const copy = useCallback(async () => {
     try {
@@ -242,6 +318,8 @@ export function DeviceReport() {
 
       {report && (
         <div className="report">
+          <GradeBanner report={report} />
+
           <Section title="Device">
             <EnvTable env={report.env} />
           </Section>
@@ -418,12 +496,19 @@ export function DeviceReport() {
             </Section>
           )}
 
-          <Section title="Copy as markdown" sub="paste into an issue or the README">
+          <Section title="Share this report" sub="real-device rows are the ones CI cannot produce">
             <div className="copyrow">
               <button className="run" onClick={() => void copy()}>
                 {copied ? "Copied" : "Copy markdown"}
               </button>
+              <a className="run secondary" href={issueUrl} target="_blank" rel="noreferrer">
+                Report this device
+              </a>
             </div>
+            <p className="hint">
+              Opens a prefilled GitHub issue. Nothing is sent anywhere until you press submit there
+              — this page has no backend and makes no network calls of its own.
+            </p>
             <textarea className="md" readOnly value={markdown} rows={14} spellCheck={false} />
           </Section>
         </div>

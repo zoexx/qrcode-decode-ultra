@@ -234,6 +234,57 @@ _Browser benchmark: chromium 151.0.7922.34, Darwin 25.5.0/x64, generated 2026-07
 
 <!--/BENCH-BROWSER-->
 
+## Compatibility
+
+Try it on your own device: **[live demo](https://zoexx.github.io/qrcode-decode-ultra/)** ·
+**[device report](https://zoexx.github.io/qrcode-decode-ultra/report.html)**. The report replays
+the fixtures below in your browser and hands you the results as pasteable markdown.
+
+The floor is high: `jsqr` is pure JavaScript, so decoding works anywhere the library loads. What
+varies is the *free* tier — `native` needs a platform `BarcodeDetector`, which WebKit has never
+shipped, so on iOS `jsqr` leads and `wechat` covers the hard codes.
+
+| Grade | Meaning |
+|---|---|
+| `full` | every tier available, all off the main thread |
+| `strong` | no platform detector — jsQR leads, WeChat covers hard codes (**where iOS lands**) |
+| `basic` | fast path only; small or damaged codes will be missed |
+| `degraded` | no worker transport, so decoding blocks the UI |
+| `blocked` | no engine can decode here |
+
+<!--COMPAT-->
+
+_Compatibility matrix: Darwin 25.5.0 x64, Playwright, generated 2026-08-14T02:34:53.774Z._
+
+| Browser engine | Grade | `native` | `wechat` | fast | max-accuracy | Leading tier (fast) |
+|---|---|---|---|---|---|---|
+| Chromium 151 | `full` | available | available | 80% | 93% | `native` 242.7 ms |
+| Firefox 153 | `strong` | `no-api` | available | 78% | 93% | `jsqr` 8.0 ms |
+| WebKit 26 | `strong` | `no-api` | available | 78% | 93% | `jsqr` 5.0 ms |
+
+> `native` is a property of the engine **and** the platform: Chromium calls Apple's Vision
+> framework on macOS and ML Kit on Android, but has no Shape Detection backend on Linux or
+> Windows. These rows are macOS. WebKit here is Playwright's build, not Safari on an iPhone —
+> the API surface matches, the hardware does not, so read capability from this table and never
+> performance. Real-device numbers come from the
+> [device report](https://zoexx.github.io/qrcode-decode-ultra/report.html).
+
+<!--/COMPAT-->
+
+### Real devices
+
+The matrix above is browser engines on one machine, so it answers *capability* and never
+performance. Hardware rows can only come from real devices — Android's `native` rides ML Kit
+rather than Apple's Vision framework, and no headless runner can say what a WeChat decode costs a
+mid-range phone. If you run the [device report](https://zoexx.github.io/qrcode-decode-ultra/report.html),
+pressing **Report this device** opens a prefilled issue and adds a row here.
+
+<!--DEVICES-->
+
+_No device reports submitted yet — run the [device report](https://zoexx.github.io/qrcode-decode-ultra/report.html) on your phone and press **Report this device**._
+
+<!--/DEVICES-->
+
 ## Development
 
 ```bash

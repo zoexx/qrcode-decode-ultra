@@ -16,6 +16,11 @@ pnpm demo         # Vite dev server for apps/demo (webcam + still image)
 pnpm benchmark    # regenerate fixtures, run the bench, rewrite the README table
 ```
 
+```bash
+pnpm -C benchmark compat          # 3-engine compatibility matrix (macOS only)
+pnpm -C benchmark compat:devices  # fold submitted device reports into the README
+```
+
 Tests live only in `packages/core`:
 
 ```bash
@@ -69,13 +74,27 @@ Where things live:
   works at a domain root or under a Pages project sub-path — **use
   `import.meta.env.BASE_URL` for runtime asset URLs, never a leading slash.**
   Deployed to GitHub Pages by `.github/workflows/pages.yml` on push to main.
-- `benchmark` — private `tsx` harness, in two halves. `harness/runner.ts` is the
-  Node runner (detection accuracy, reproduces anywhere); `browser/runner.ts`
-  drives headless Chromium via Playwright for the two things Node cannot see —
-  whether `native` is real, and main-thread blocking. Both write to `results/`
-  (gitignored) and inject between `<!--BENCH-->` / `<!--BENCH-BROWSER-->` markers
-  in the root README. Benchmarks are not in the merge-gate CI workflow; they run
-  from `.github/workflows/bench.yml` on demand.
+- `benchmark` — private `tsx` harness, now in three parts, each answering a
+  question the others structurally cannot:
+  - `harness/runner.ts` — Node runner (detection accuracy, reproduces anywhere).
+    `native` is always `n/a` here.
+  - `browser/runner.ts` — headless Chromium via Playwright, for whether `native`
+    is real and what a decode costs the main thread.
+  - `compat/runner.ts` — the **compatibility matrix**: drives the built
+    `apps/demo` report page across Chromium, Firefox *and* WebKit and reads the
+    structured `window.qrduReport` each run publishes, so it never reimplements
+    what a device report contains. **Must run on macOS** — `native` is an engine
+    *and platform* property (Chromium has no Shape Detection backend on Linux at
+    all), so a Linux matrix publishes confidently false rows. Its workflow
+    (`compat.yml`) pins `macos-latest` for exactly this reason.
+  - `compat/devices.ts` — folds `device-report`-labelled GitHub issues (opened by
+    the report page's "Report this device" button) into the README's real-device
+    table. No backend and nothing automatic: a row exists because someone
+    submitted it.
+
+  All write to `results/` (gitignored) and inject between `<!--BENCH-->`,
+  `<!--BENCH-BROWSER-->`, `<!--COMPAT-->` and `<!--DEVICES-->` markers in the root
+  README. None are merge gates; they run from `bench.yml` / `compat.yml` on demand.
 
 ## Conventions
 

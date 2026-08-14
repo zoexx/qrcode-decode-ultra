@@ -1,0 +1,36 @@
+# Compatibility matrix across all three browser engines.
+#
+# Runs on **macos-latest**, not ubuntu, and that is not incidental. `native` is
+# an engine *and platform* property: Chromium has no Shape Detection backend on
+# Linux at all, so a Linux matrix would report "Chromium: no native" — true for
+# that runner, wrong for every platform users are actually on. macOS gives
+# Chromium its Vision backend and makes the WebKit row meaningful.
+#
+# Not a merge gate (ci.yml owns typecheck + test). Run it on demand, then commit
+# the README table it rewrites.
+name: compat
+
+on:
+  workflow_dispatch:
+
+jobs:
+  compat:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The demo builds against packages/*/dist.
+      - run: pnpm build
+      - run: pnpm -C benchmark exec playwright install chromium firefox webkit
+      - run: pnpm -C benchmark compat
+      - uses: actions/upload-artifact@v4
+        with:
+          name: compat-results
+          path: |
+            benchmark/results/compat.json
+            README.md
