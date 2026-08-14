@@ -6,3 +6,18 @@ packages:
 onlyBuiltDependencies:
   - esbuild
   - sharp
+
+# Security patches for transitive build tooling. All three arrive via
+# vite / tsx / tsup and are dev-only — none reaches a published package, whose
+# only runtime dependencies are jsqr and qr-scanner-wechat. Ranged keys, so each
+# override lapses by itself once the parents ship the patched version.
+#
+# Lives here rather than in package.json's `pnpm.overrides`: pnpm 10 no longer
+# reads that field and ignores it with only a warning.
+# Each replacement stays inside the major its dependents ask for. An open-ended
+# '>=3.3.18' on nanoid resolves to 6.x, which is ESM-only with a changed API and
+# is not what postcss's `^3` means to accept.
+overrides:
+  esbuild@<0.28.1: ^0.28.1
+  nanoid@<3.3.18: ^3.3.18
+  postcss@<8.5.23: ^8.5.23

@@ -14,11 +14,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "qrcode-decode-ultra": "workspace:*",
-    "qrcode-decode-ultra-wechat": "workspace:*",
     "jsqr": "1.4.0",
     "qrcode": "1.5.4",
-    "sharp": "^0.34.0"
+    "qrcode-decode-ultra": "workspace:*",
+    "qrcode-decode-ultra-wechat": "workspace:*",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
