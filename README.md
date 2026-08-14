@@ -81,10 +81,18 @@ flowchart TD
   the constructor can exist while `detect()` silently returns `[]`, and a
   ponyfill can shadow it — so the engine decodes a baked-in synthetic QR and
   checks for `[native code]` before native may win. Where it is real (Android
-  Chrome, Chromium on macOS/ChromeOS) it is cheaper *and* stronger than the jsQR
-  tier behind it: Chromium's macOS backend calls Apple's Vision framework,
-  Android's rides ML Kit. Not the strongest tier overall — see `downscale_32`
-  below.
+  Chrome, Chromium on macOS/ChromeOS) it carries **no payload at all** — 0 KB
+  against jsQR's ~45 KB gzipped — because it is not a reimplementation:
+  Chromium's macOS backend calls Apple's Vision framework, Android's rides ML
+  Kit. It is also *slightly* stronger than the jsQR tier behind it, though less
+  than the ordering suggests — across the corpus below it reads exactly one more
+  fixture (a `damaged` code); every other category ties. Cheaper here means
+  payload, not latency: in headless runs an end-to-end native scan measured
+  **slower** than jsQR's, and headless wall-clock is too noisy to conclude
+  anything from — run the
+  [device report](https://zoexx.github.io/qrcode-decode-ultra/report.html) to see
+  which tier actually wins on your hardware. Not the strongest tier overall —
+  see `downscale_32` below.
 - **The escalation warms itself.** A live frame whose smaller dimension drops
   below `lowResPreloadPx` (default 480) starts the WeChat load in the background,
   so it is in flight — usually done — before the frame that needs it.

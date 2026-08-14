@@ -53,14 +53,23 @@ upstream. `EngineStatus.code` carries the machine-readable cause and
 | `not-installed` | no engine registered for the id | `enableWechat()` never called |
 | `error` | the availability check threw | — |
 
-Where native *is* real it is the cheapest tier and stronger than the `jsqr` tier
-behind it — though not stronger than `wechat`, which still wins the `downscale_32`
-and `torture` categories in `pnpm benchmark:browser`. It earns that because it is
-not a reimplementation: Chromium's macOS backend calls Apple's Vision
-framework (`VNDetectBarcodesRequest`), and on Android the same API rides Google
-Play Services / ML Kit. There is no portable artifact to vendor from either — you
-can only call them — which is exactly why the cascade probes for them and lets
-them win first.
+Where native *is* real it is the cheapest tier by payload — 0 KB — and slightly
+stronger than the `jsqr` tier behind it, though not stronger than `wechat`, which
+still wins the `downscale_32` and `torture` categories in `pnpm benchmark:browser`.
+It earns that because it is not a reimplementation: Chromium's macOS backend
+calls Apple's Vision framework (`VNDetectBarcodesRequest`), and on Android the
+same API rides Google Play Services / ML Kit. There is no portable artifact to
+vendor from either — you can only call them — which is exactly why the cascade
+probes for them and lets them win first.
+
+**How much stronger is "slightly"?** In `pnpm -C benchmark compat`, the `fast`
+preset scores 80% with native (Chromium) against 78% without it (Firefox,
+WebKit) on the same corpus: one fixture, in `damaged`. Every other category ties.
+That is the honest size of the win, and it is worth having only because it costs
+nothing to take. Note also what the ordering does *not* claim — native is first
+because it is free, not because it is fastest. Headless runs measure its
+end-to-end scan as slower than `jsqr`'s, at magnitudes too noisy to publish; the
+device report is what settles the question on real hardware.
 
 ### Presets
 
