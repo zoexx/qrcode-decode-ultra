@@ -1,6 +1,6 @@
 {
   "name": "qrcode-decode-ultra-wechat",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Opt-in OpenCV WeChat QRCode engine for QRCode Decode Ultra — high accuracy on hard codes (~2.5MB WASM).",
   "type": "module",
   "license": "MIT",
