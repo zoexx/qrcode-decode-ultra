@@ -61,6 +61,6 @@
     "qrcode": "1.5.4",
     "tsup": "8.5.1",
     "typescript": "^5.7.0",
-    "vitest": "4.1.8"
+    "vitest": "4.1.11"
   }
 }
